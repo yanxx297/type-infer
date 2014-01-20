@@ -1,9 +1,4 @@
-CC=g++
-LDFLAGS=-L/home/yanxx297/binary_analysis/dwarf-20130207/libdwarf -L/home/yanxx297/binary_analysis/vine-1.0/libasmir/src -L/home/yanxx297/binary_analysis/vine-1.0/VEX
-CFLAGS=-Wall -w 
-I_VINE=-I/home/yanxx297/binary_analysis/dwarf-20130207/libdwarf -I/home/yanxx297/binary_analysis/vine-1.0/libasmir/src/include -I/home/yanxx297/binary_analysis/vine-1.0/VEX/pub -I/home/yanxx297/binary_analysis/vine-1.0/libasmir
-#INCLUDE=-I/home/yanxx297/project/src/include 
-LIBS=-lasmir -lvex -lbfd -liberty -lopcodes -ldwarf -lelf
+include Makefile.variable
 MAKE=make
 
 all: infer

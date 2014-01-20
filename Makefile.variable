@@ -1,0 +1,11 @@
+CC=g++
+DWARF=/home/yanxx297/binary_analysis/dwarf-20130207/libdwarf
+VINE=/home/yanxx297/binary_analysis/vine-1.0/libasmir
+VEX=/home/yanxx297/binary_analysis/vine-1.0/VEX
+HOME=/home/yanxx297/project/src
+
+LDFLAGS=-L$(DWARF) -L$(VINE)/src -L$(VEX)
+CFLAGS=-Wall -w 
+I_VINE=-I$(DWARF) -I$(VINE)/src/include -I$(VEX)/pub -I$(VINE)
+INCLUDE=-I$(HOME)/include
+LIBS=-lasmir -lvex -lbfd -liberty -lopcodes -ldwarf -lelf
