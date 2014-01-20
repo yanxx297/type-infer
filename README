@@ -1,0 +1,9 @@
+Description:
+The source code of a type inference research project under construction.
+
+Build:
+Run make in type-infer-src/
+The following libraries should be installed before this code can be compiled:
+	- Libdwarf: http://dwarfstd.org/
+	- Vine: bitblaze.cs.berkeley.edu/release/vine-1.0/vine-1.0.tar.gz
+	- Boost Graph Library: http://www.boost.org/libs/graph/
