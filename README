@@ -10,3 +10,5 @@ The following libraries should be installed before this code can be compiled:
 - Boost Graph Library: http://www.boost.org/libs/graph/
 Make sure the paths of libraries and the home path are correctly set. 
 You can set them in type-infer-src/Makefile.variable.
+
+test branch
