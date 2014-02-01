@@ -1109,3 +1109,23 @@ string get_full_name(dbase *var){
 	//tcout<<"get_full_name: "<<result<<endl;
 	return result;
 }
+
+//check whether it is a movzbl/movsbl
+//set source variable to signed/unsigned, respectively
+void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::vertex_descriptor v_src, Graph &g){
+	if(src->exp->exp_type == MEM){
+		Mem *m_src = (Mem *)src->exp;
+		if(m_src->typ < dst->typ){
+			if(src->cast_type == CAST_SIGNED){
+				//movsbl -> signed
+				add_edge_with_cap(func_list->s_des,v_src, MAX_CAP, 0, g);
+			}else if(src->cast_type == CAST_UNSIGNED){
+				//movzbl -> unsigned
+				add_edge_with_cap(v_src, func_list->u_des, MAX_CAP, 0, g);
+			}else{
+				//neither
+				//do nothing
+			}
+		}
+	}
+}

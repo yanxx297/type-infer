@@ -65,11 +65,12 @@ BOOL Pointed::cmp_ptr_type(dvariable * ptr){
 	if(this->debug_info_list.at(0)->cmp_type(ptr) == YES){
 		/*Check whether in the same structure*/
 		/*If yes, then not treated as the same type*/
-		dvariable *myparent = this->debug_info_list.at(0)->parent;
-		dvariable *parent = ptr->parent;
-		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
-			result = YES;
-		}
+//		dvariable *myparent = this->debug_info_list.at(0)->parent;
+//		dvariable *parent = ptr->parent;
+//		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
+//			result = YES;
+//		}
+		result = YES;
 	}
 	return result;
 }

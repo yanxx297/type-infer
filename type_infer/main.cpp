@@ -116,13 +116,34 @@ void remove_unrelated_nodes(func_vertex_ptr func_block, Undirect_Graph& g, Graph
     		if(ug_vet[*vp.first] != VARIABLE && ug_vet[*vp.first] != POINTED){
         		g_vi[src] = NO;
         		//printf("remove node %s\n", g_name[src].c_str());
-    		}else if(ug_vet[*vp.first] == VARIABLE){
+    		}
+//    		else if(ug_vet[*vp.first] == VARIABLE){
+//    			func_block->variable_list.at(g_id[src])->infered_su = UNKNOW_T;
+//    		}else if(ug_vet[*vp.first] == POINTED){
+//    			func_block->ptarget_list.at(g_id[src])->infered_su = UNKNOW_T;
+//    		}
+    	}
+    }
+}
+
+void set_component_to_unknown(func_vertex_ptr func_block, Undirect_Graph& g, Graph &dig, boost::disjoint_sets<Rank, Parent>& ds){
+	boost::property_map<Graph, visible_type_t>::type g_vi = boost::get(visible_type_t(), dig);
+	boost::property_map<Undirect_Graph, vertex_exp_type_t>::type ug_vet = boost::get(vertex_exp_type_t(), g);
+	boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, dig);
+	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), dig);
+	pair<vertex_iter, vertex_iter> vp;
+    for (vp = vertices(g); vp.first != vp.second; ++vp.first){
+    	if(ds.find_set(*vp.first) != ds.find_set(func_block->s_des) &&
+    			ds.find_set(*vp.first) != ds.find_set(func_block->u_des)){
+    		Graph::vertex_descriptor src = undi_to_dig(*vp.first, g, dig, func_block);
+    		if(ug_vet[*vp.first] == VARIABLE){
     			func_block->variable_list.at(g_id[src])->infered_su = UNKNOW_T;
     		}else if(ug_vet[*vp.first] == POINTED){
     			func_block->ptarget_list.at(g_id[src])->infered_su = UNKNOW_T;
     		}
     	}
     }
+
 }
 
 //Set the whole component to signed
@@ -796,7 +817,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 				break;
 			}
 			case MOVE:{
-				//get pointers
+				//check whether this MOVE is an access of pointers
 				get_ptr_copy(func_list, ((Move *)vine_ir_block->block_list[j]->block[k]), j, k);
 
 				//Check variable with offset(s)
@@ -806,6 +827,17 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 				v_r = read_exp(func_list, j, k, ((Move *)vine_ir_block->block_list[j]->block[k])->rhs, g);
 
 				if(v_l == -1 || v_r == -1){
+					//NOTE: T will return a -1
+					if(v_l == -1 && v_r != -1 &&
+							((Move *)vine_ir_block->block_list[j]->block[k])->lhs->exp_type == TEMP &&
+							((Move *)vine_ir_block->block_list[j]->block[k])->rhs->exp_type == CAST){
+						//Check movzbl/movsbl
+						Temp *dst = ((Temp *)((Move *)vine_ir_block->block_list[j]->block[k])->lhs);
+						Cast *src = ((Cast *)((Move *)vine_ir_block->block_list[j]->block[k])->rhs);
+						check_movzsbl(func_list, src, dst, v_r, g);
+					}else{
+						//do nothing
+					}
 					break;
 				}
 
@@ -977,9 +1009,12 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 	boost::incremental_components(new_graph, ds);
 
 	//   	    "Remove" extra vertices
-	//remove_unrelated_nodes(func_list, new_graph, g, ds);
+	remove_unrelated_nodes(func_list, new_graph, g, ds);
 
-	//   	    Handle different situations separtely
+	//Set componets that neither contains SIGNED nor UNSIGNED vertice to UNKNOWN_T
+	set_component_to_unknown(func_list, new_graph, g, ds);
+
+	//   	    Handle different situations
 	//   	    compute minimum cut if there is more than one component
 	if (ds.find_set(func_list->s_des)
 			== ds.find_set(func_list->u_des)) {
@@ -1006,7 +1041,7 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 		look_for_binop_by_des(func_list[i], func_list[i]->variable_list.at(1)->my_descriptor, XOR, graph_list.at(i));
 #endif
 
-		id_to_vineir(func_list, g);
+		//id_to_vineir(func_list, g);
 
 	} else {
 		//Coloring every node in signed component to red(signed)

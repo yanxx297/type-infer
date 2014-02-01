@@ -41,4 +41,6 @@ BOOL compare_exp(Exp *former, Exp *latter);
 
 string get_full_name(dbase *var);
 
+void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::vertex_descriptor v_src, Graph &g);
+
 #endif /* INFER_H_ */
