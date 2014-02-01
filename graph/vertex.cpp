@@ -29,6 +29,7 @@ extern "C"
 #include "tmp_s.h"
 #include "vine_api.h"
 #include "vertex.h"
+#include "ptr_handler.h"
 
 vertex::vertex(vertex_type_t vertex_type, Graph::vertex_descriptor descriptor)
 :vertex_type(vertex_type), my_descriptor(descriptor)
@@ -62,7 +63,13 @@ void Pointed::Add_into_list(dbase *debug_info){
 BOOL Pointed::cmp_ptr_type(dvariable * ptr){
 	BOOL result = NO;
 	if(this->debug_info_list.at(0)->cmp_type(ptr) == YES){
-		result = YES;
+		/*Check whether in the same structure*/
+		/*If yes, then not treated as the same type*/
+		dvariable *myparent = this->debug_info_list.at(0)->parent;
+		dvariable *parent = ptr->parent;
+		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
+			result = YES;
+		}
 	}
 	return result;
 }
@@ -112,8 +119,9 @@ void pointer_info::print_copylist(){
 
 pointer_list::pointer_list(){}
 
-void pointer_list::add_pointer(dptr *debug_info){
+BOOL pointer_list::add_pointer(dptr *debug_info){
 	int i;
+	BOOL res = NO;
 	pointer_info *p_info = new pointer_info(debug_info);
 	for(i = 0; i < this->plist.size(); i++){
 		if(check_child(p_info->debug_info, this->plist.at(i)->debug_info) == YES){
@@ -126,7 +134,14 @@ void pointer_list::add_pointer(dptr *debug_info){
 			this->plist.at(i)->child_list.push_back(p_info);
 		}
 	}
-	this->plist.push_back(p_info);
+
+	/*Check duplicate of p_info itself*/
+	if(check_plist(p_info->debug_info, this->plist) == -1){
+		this->plist.push_back(p_info);
+		res = YES;
+	}
+
+	return res;
 }
 
 void pointer_list::print_plist(){

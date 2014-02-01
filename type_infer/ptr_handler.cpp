@@ -117,7 +117,21 @@ int check_reg_for_offset(Exp *equal, Tmp_s *exp){
 	return result;
 }
 
+//check whether ptr is already added into plist
+//Note that plist is pointer itself, rather than variables pointed by a pointer (ptarget)
+int check_plist(dptr *ptr, vector<pointer_info *> plist){
+	int i;
+	int res = -1;
+	for(i = 0; i< plist.size(); i++){
+		if(plist.at(i)->debug_info->cmp_type(ptr) == YES){
+			res = i;
+			break;
+		}
+	}
+	return res;
+}
 
+//Check duplicated ptarget
 //Check whether the type of <ptr> already exist
 //Return position in vector if found
 int check_ptr(dvariable * ptr, func_vertex_ptr func_list){
@@ -272,6 +286,7 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 	}
 };
 
+//check whether a memory access corresponse to a pointed target (ptarget)
 int ptarget_lookup(func_vertex_ptr func_block, Mem *exp, int block, int stmt){
 	int result = -1;
 	int i, j, k, w;

@@ -156,7 +156,7 @@ public:
 class pointer_list{
 public:
 	pointer_list();
-	void add_pointer(dptr *debug_info);
+	BOOL add_pointer(dptr *debug_info);
 	void print_plist();
 	int getsize();
 	void print_copylists();

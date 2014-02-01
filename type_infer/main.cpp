@@ -465,8 +465,9 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 	}
 	case DVAR_POINTER:{
 		dptr * ptr = (dptr *)var;
-		func_list->ptr_list.add_pointer(ptr);
-		if(ptr->var != 0 && ptr->leaf != YES){
+		BOOL res_add = func_list->ptr_list.add_pointer(ptr);
+		if(ptr->var != 0 && ptr->leaf != YES && res_add == YES){
+			//Only continue adding child if this pointer is not duplicate
 			push_each_pointer(ptr->var, func_list, g);
 		}
 		break;
@@ -489,7 +490,8 @@ void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g){
 		if(base->original_su == SIGNED_T || base->original_su == UNSIGNED_T){
 			v_reg = add_default_vertex(g, base->original_su);
 		}else{
-			perror("Unknown type of variable, stop.");
+			//base->print_me();
+			cout<<"Unknown type of variable, stop."<<endl;
 			break;
 		}
 
@@ -528,11 +530,17 @@ void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g){
 	case DVAR_POINTER:{
 		cout<<"check ptr: "<<var->var_name<<endl;
 		dptr * ptr = (dptr *)var;
-		if(ptr->var != 0 && ptr->leaf != YES){
-			push_each_var(ptr->var, func_list, g);
-		}else if(ptr->var != 0 && ptr->leaf == YES){
+		if(ptr->var != 0){
 			push_each_pointer(ptr,func_list,g);
+//			if(ptr->leaf != YES){
+//				push_each_var(ptr->var, func_list, g);
+//			}
 		}
+//		if(ptr->var != 0 && ptr->leaf != YES){
+//			push_each_var(ptr->var, func_list, g);
+//		}else if(ptr->var != 0 && ptr->leaf == YES){
+//			push_each_pointer(ptr,func_list,g);
+//		}
 		break;
 	}
 	default:{
@@ -668,10 +676,10 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 		break;
 	}
 	case MEM:{
-		vtd = var_lookup(func_block, exp, block, stmt);
+		vtd = ptarget_lookup(func_block, ((Mem *)exp), block, stmt);
 
 		if(vtd == -1){
-			vtd = ptarget_lookup(func_block, ((Mem *)exp), block, stmt);
+			vtd = var_lookup(func_block, exp, block, stmt);
 		}
 
 		//If still can't find, then look for mem[] = reg and return the vtd of reg
@@ -969,7 +977,7 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 	boost::incremental_components(new_graph, ds);
 
 	//   	    "Remove" extra vertices
-	remove_unrelated_nodes(func_list, new_graph, g, ds);
+	//remove_unrelated_nodes(func_list, new_graph, g, ds);
 
 	//   	    Handle different situations separtely
 	//   	    compute minimum cut if there is more than one component
@@ -1007,8 +1015,8 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 
 
 //	Apply debug tools
-	Traits::vertex_descriptor src = 2;
-	print_path(src, func_list->u_des, g);
+//	Traits::vertex_descriptor src = 2;
+//	print_path(src, func_list->u_des, g);
 //	End of debug tools
 
 	//Display pointed info

@@ -5,7 +5,7 @@ all: infer
 
 #infer: main.o infer.o ptr_handler.o debug_info.o type_dwarf_util.o dvar.o location.o vertex.o vine_api.o tmp_s.o debug_tool.o draw_dot.o
 infer: task_dwarf task_vine task_graph task_util task_infer
-	$(CC) $(CFLAGS) $(I_VINE) main.o infer.o ptr_handler.o debug_tool.o draw_dot.o debug_info.o type_dwarf_util.o dvar.o location.o vertex.o vine_api.o tmp_s.o $(LDFLAGS) $(LIBS) -o infer
+	$(CC) $(CFLAGS) $(I_VINE) main.o infer.o ptr_handler.o debug_tool.o draw_dot.o debug_info.o type_dwarf_util.o dvar.o location.o vertex.o vine_api.o tmp_s.o $(LDFLAGS) $(LIBS) -g -o infer
 	rm *.o
 
 task_dwarf:
