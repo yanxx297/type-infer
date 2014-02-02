@@ -890,7 +890,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 
 }
 
-void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, bool ssaf){
+void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, bool ssaf, bool rmvf){
 	int i, j, k;
 	fblock_ptr tmp;
 	tmp = transform_to_ssa(vine_blocks, prog, func_num);
@@ -1010,7 +1010,9 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 	boost::incremental_components(new_graph, ds);
 
 	//   	    "Remove" extra vertices
-	remove_unrelated_nodes(func_list, new_graph, g, ds);
+	if(rmvf == true){
+		remove_unrelated_nodes(func_list, new_graph, g, ds);
+	}
 
 	//Set componets that neither contains SIGNED nor UNSIGNED vertice to UNKNOWN_T
 	set_component_to_unknown(func_list, new_graph, g, ds);
@@ -1124,6 +1126,7 @@ main(int argc, char **argv)
     trans_to_vineir(argv[1], vine_blocks, asmprog);
     int func_num = -1;
     bool ssaf_flag = false;
+    bool rmv_flag = false;
 
     for(count = 0; count < argc; count++){
     	if(strcmp(argv[count], "-single")==0 && (count+1)<argc){
@@ -1139,16 +1142,23 @@ main(int argc, char **argv)
     	}
     }
 
+    for(count = 0; count < argc; count++){
+    	if(strcmp(argv[count], "-rmv")==0){
+    		rmv_flag = true;
+    		break;
+    	}
+    }
+
     if(func_num == -1){
     	/*handle all functions*/
     	int vineIR_func_num = vine_blocks.size();
     	for(i = 0; i < vineIR_func_num; i++){
-    		handle_function(vine_blocks, asmprog, prog, i, ssaf_flag);
+    		handle_function(vine_blocks, asmprog, prog, i, ssaf_flag, rmv_flag);
     	}
 
     }else{
     	/*handle a signle function*/
-    	handle_function(vine_blocks, asmprog, prog, func_num, ssaf_flag);
+    	handle_function(vine_blocks, asmprog, prog, func_num, ssaf_flag, rmv_flag);
     }
 
 
