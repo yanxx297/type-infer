@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "asm_program.h"
 #include "disasm-pp.h"
@@ -141,7 +142,7 @@ static void handle_var_die(struct subprog &curr_sub, Dwarf_Debug dbg, Dwarf_Die 
 	Dwarf_Off offset_type;
 	my_type = get_type(dbg, print_me, &offset_type);
 	res = dwarf_tag(my_type, &tag, &error);
-	BOOL result = NO;
+	bool result = false;
 	if (res != DW_DLV_OK) {
 		perror("No tag for var DIE");
 		exit(1);
@@ -151,7 +152,7 @@ static void handle_var_die(struct subprog &curr_sub, Dwarf_Debug dbg, Dwarf_Die 
 	case DW_TAG_pointer_type: {
 		struct var_info *curr_var;
 		result = get_var(dbg, print_me, level + 1, curr_var);
-		if (result == YES) {
+		if (result == true) {
 			printf("push %s\n",curr_var->var_name.c_str());
 			curr_sub.variable.push_back(curr_var);
 		}
@@ -165,7 +166,7 @@ static void handle_var_die(struct subprog &curr_sub, Dwarf_Debug dbg, Dwarf_Die 
 		/*get_var one by one*/
 		struct var_info *curr_var;
 		result = get_var(dbg, print_me, level, curr_var);
-		if (result == YES) {
+		if (result == true) {
 			Dwarf_Unsigned tmp_loc;
 			LOCTYPE tmp_loctype;
 			tmp_loctype = curr_var->loc_type;
@@ -188,7 +189,7 @@ static void handle_var_die(struct subprog &curr_sub, Dwarf_Debug dbg, Dwarf_Die 
 					exit(1);
 				}
 				result = get_var(dbg, next_mem, level + 1, curr_var);
-				if (result == YES) {
+				if (result == true) {
 					curr_var->loc_type = tmp_loctype;
 					if (tmp_loctype == OFFSET) {
 						curr_var->var_offset.offset = tmp_loc;
@@ -506,7 +507,7 @@ void get_struct_ptr(Dwarf_Debug dbg, Dwarf_Die var, Dwarf_Off type_offset, Dwarf
 
 	curr_var->pointed_info.offset_strucr = set_offset(member);
 
-	curr_var->pointed_info.addr_set = NO;
+	curr_var->pointed_info.addr_set = false;
 
 	ret = curr_var;
 
@@ -522,7 +523,7 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 	int localname = 0;
 	int i, j, k;
 	int res;
-	BOOL result = NO;
+	bool result = false;
 
 	/*get tag attr*/
 	res = dwarf_tag(print_me, &tag, &error);
@@ -571,7 +572,7 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 
 				if (tag == DW_TAG_base_type) {
 					result = get_var(dbg, next_die, level + 1, curr_var);
-					if (result == YES) {
+					if (result == true) {
 						curr_sub.variable.push_back(curr_var);
 					}
 
@@ -612,7 +613,7 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 						}
 					}else{
 						result = get_var(dbg, next_die, level + 1, curr_var);
-						if (result == YES) {
+						if (result == true) {
 							curr_sub.variable.push_back(curr_var);
 						}
 					}
@@ -690,7 +691,7 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 					/*structure*/
 					/*get_var one by one*/
 					result = get_var(dbg, next_die, level, curr_var);
-					if (result == YES) {
+					if (result == true) {
 						Dwarf_Unsigned tmp_loc;
 						LOCTYPE tmp_loctype;
 						tmp_loctype = curr_var->loc_type;
@@ -708,7 +709,7 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 						}
 						while (res == DW_DLV_OK) {
 							result = get_var(dbg, next_mem, level + 1, curr_var);
-							if(result == YES){
+							if(result == true){
 								curr_var->loc_type = tmp_loctype;
 								if (tmp_loctype == OFFSET) {
 									curr_var->var_offset.offset = tmp_loc;
@@ -747,7 +748,7 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 	} else if (tag == DW_TAG_variable && level == 1) {
 		/*global variable*/
 		result = get_var(dbg, print_me, level + 1, curr_var);
-		if (result == YES) {
+		if (result == true) {
 			debug_info.at(0).variable.push_back(curr_var);
 		}
 	}
@@ -917,9 +918,9 @@ static struct var_info *get_array_member(Dwarf_Debug dbg, Dwarf_Die print_me,
 
 }
 
-static BOOL get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_info *&ret) {
+static bool get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_info *&ret) {
 	//printf("get var\n");
-	BOOL result = NO;
+	bool result = false;
 	struct var_info *curr_var = new struct var_info();
 	char *name = 0;
 	Dwarf_Error error = 0;
@@ -990,7 +991,7 @@ static BOOL get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_i
 				curr_var->su_type = set_su(typeDie);
 
 				ret = curr_var;
-				result = YES;
+				result = true;
 			} else {
 				/*Pointer*/
 				//char *name = 0;
@@ -1016,7 +1017,7 @@ static BOOL get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_i
 				}else if(ptr_tag == DW_TAG_structure_type){
 					/*Do nothing*/
 					/*handle this condition separately*/
-					result = NO;
+					result = false;
 					return result;
 				}else{}
 
@@ -1025,15 +1026,15 @@ static BOOL get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_i
 				curr_var->pointed_info.offset = offset_type;
 				curr_var->pointed_info.offset_strucr = -1;
 				curr_var->pointed_info.su_type = s_u;
-				curr_var->pointed_info.addr_set = NO;
+				curr_var->pointed_info.addr_set = false;
 
 				ret = curr_var;
-				result = YES;
+				result = true;
 			}
 		}
 
 	} else {
-		result = NO;
+		result = false;
 		curr_var->var_length = 0;
 	}
 

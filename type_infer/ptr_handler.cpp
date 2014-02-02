@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <set>
 #include <utility>
+#include <stdbool.h>
 
 /*include libdwarf*/
 #include "dwarf.h"
@@ -123,7 +124,7 @@ int check_plist(dptr *ptr, vector<pointer_info *> plist){
 	int i;
 	int res = -1;
 	for(i = 0; i< plist.size(); i++){
-		if(plist.at(i)->debug_info->cmp_type(ptr) == YES){
+		if(plist.at(i)->debug_info->cmp_type(ptr) == true){
 			res = i;
 			break;
 		}
@@ -138,7 +139,7 @@ int check_ptr(dvariable * ptr, func_vertex_ptr func_list){
 	int res = -1;
 	int i;
 	for(i = 0; i < func_list->ptarget_list.size(); i++){
-		if(func_list->ptarget_list.at(i)->cmp_ptr_type(ptr) == YES){
+		if(func_list->ptarget_list.at(i)->cmp_ptr_type(ptr) == true){
 			res = i;
 			break;
 		}
@@ -170,8 +171,8 @@ int copy_from_reg_lookup(func_vertex_ptr func_block, int block, int stmt, Mem *e
 
 					//addr should be the same address of Mem *exp, if so
 					//Look for the descriptor of reg
-					BOOL mem_cmp = compare_mem(exp, (Mem *)equal->lhs);
-					if(mem_cmp == YES){
+					bool mem_cmp = compare_mem(exp, (Mem *)equal->lhs);
+					if(mem_cmp == true){
 						result = search_reg(func_block, (Tmp_s *)equal->rhs);
 						if(result != -1){
 							result = func_block->reg_list.at(result)->my_descriptor;
@@ -196,25 +197,25 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 	Tmp_s * reg2 = 0;
 	int type = 0; //type 1 or 2
 	int cons = -1;
-	if(is_tmps(exp->lhs) == YES){
+	if(is_tmps(exp->lhs) == true){
 		reg1 = (Tmp_s *)exp->lhs;
 		Mem * mem = 0;
 		if(exp->rhs->exp_type == BINOP){
 			BinOp * binop = (BinOp *)exp->rhs;
-			if(is_tmps(binop->lhs) == YES && binop->rhs->exp_type == MEM){
+			if(is_tmps(binop->lhs) == true && binop->rhs->exp_type == MEM){
 				/*reg1 = reg0 + mem[reg2 (+ cons)]*/
 				type = 1;
 				mem = (Mem *)binop->rhs;
-			}else if(is_tmps(binop->rhs) == YES && binop->lhs->exp_type == MEM){
+			}else if(is_tmps(binop->rhs) == true && binop->lhs->exp_type == MEM){
 				/*reg1 = mem[reg2 (+ cons)] + reg0*/
 				type = 1;
 				mem = (Mem *)binop->lhs;
-			}else if(is_tmps(binop->lhs) == YES && binop->rhs->exp_type == CONSTANT){
+			}else if(is_tmps(binop->lhs) == true && binop->rhs->exp_type == CONSTANT){
 				/*reg1 = reg2 + cons*/
 				type = 2;
 				reg2 = (Tmp_s *)binop->lhs;
 				cons = ((Constant *)binop->rhs)->val;
-			}else if(is_tmps(binop->rhs) == YES && binop->lhs->exp_type == CONSTANT){
+			}else if(is_tmps(binop->rhs) == true && binop->lhs->exp_type == CONSTANT){
 				/*reg1 = cons + reg2 */
 				type = 2;
 				reg2 = (Tmp_s *)binop->rhs;
@@ -229,10 +230,10 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 		if(type == 1){
 			if(mem->addr->exp_type == BINOP ){
 				BinOp *addr = (BinOp *)mem->addr;
-				if(is_tmps(addr->lhs) == YES && addr->rhs->exp_type == CONSTANT){
+				if(is_tmps(addr->lhs) == true && addr->rhs->exp_type == CONSTANT){
 					reg2 = (Tmp_s *)addr->lhs;
 					cons = ((Constant *)addr->rhs)->val;
-				}else if(is_tmps(addr->rhs) == YES && addr->lhs->exp_type == CONSTANT){
+				}else if(is_tmps(addr->rhs) == true && addr->lhs->exp_type == CONSTANT){
 					reg2 = (Tmp_s *)addr->rhs;
 					cons = ((Constant *)addr->lhs)->val;
 				}
@@ -250,7 +251,7 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 
 			for(i = 0; i < func_block->ptr_list.getsize(); i++){
 				dptr * ptr = func_block->ptr_list.plist.at(i)->debug_info;
-				if(ptr->cmp_loc(mem, pc) == YES){
+				if(ptr->cmp_loc(mem, pc) == true){
 					func_block->ptr_list.plist.at(i)->copy_list.push_back(reg1);
 					return;
 				}else{
@@ -258,8 +259,8 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 						if(reg2->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
 							for(k = 0; k < func_block->ptr_list.plist.at(i)->child_list.size(); k++){
 								pointer_info * child = func_block->ptr_list.plist.at(i)->child_list.at(k);
-								BOOL cmp_res = cmp_offset(cons, child->debug_info);
-								if(cmp_res == YES){
+								bool cmp_res = cmp_offset(cons, child->debug_info);
+								if(cmp_res == true){
 									child->copy_list.push_back(reg1);
 									return;
 								}
@@ -295,14 +296,14 @@ int ptarget_lookup(func_vertex_ptr func_block, Mem *exp, int block, int stmt){
 
 	if(exp->addr->exp_type == BINOP){
 		BinOp *addr = (BinOp *)exp->addr;
-		if(is_tmps(addr->lhs) == YES && addr->rhs->exp_type == CONSTANT){
+		if(is_tmps(addr->lhs) == true && addr->rhs->exp_type == CONSTANT){
 			reg = (Tmp_s *)addr->lhs;
 			cons = ((Constant *)addr->rhs)->val;
-		}else if(is_tmps(addr->rhs) == YES && addr->lhs->exp_type == CONSTANT){
+		}else if(is_tmps(addr->rhs) == true && addr->lhs->exp_type == CONSTANT){
 			reg = (Tmp_s *)addr->rhs;
 			cons = ((Constant *)addr->lhs)->val;
 		}
-	}else if(is_tmps(exp->addr) == YES){
+	}else if(is_tmps(exp->addr) == true){
 		reg = (Tmp_s *)exp->addr;
 		cons = 0;
 	}
@@ -318,9 +319,9 @@ int ptarget_lookup(func_vertex_ptr func_block, Mem *exp, int block, int stmt){
 				for(k = 0; k < func_block->ptarget_list.size(); k++){
 					for(w = 0; w < func_block->ptarget_list.at(k)->debug_info_list.size(); w++){
 						dbase *child = func_block->ptarget_list.at(k)->debug_info_list.at(w);
-						if(check_child(parent_ptr, child) == YES){
-							BOOL res = cmp_offset(cons, child);
-							if(res == YES){
+						if(check_child(parent_ptr, child) == true){
+							bool res = cmp_offset(cons, child);
+							if(res == true){
 								result = func_block->ptarget_list.at(k)->my_descriptor;
 								return result;
 							}
@@ -330,9 +331,9 @@ int ptarget_lookup(func_vertex_ptr func_block, Mem *exp, int block, int stmt){
 
 				/*check linklist*/
 				for(k = 0; k < func_block->variable_list.size(); k++){
-					if(check_child_from_parent(parent_ptr, func_block->variable_list.at(k)->debug_info) == YES){
-						BOOL res = cmp_offset(cons, func_block->variable_list.at(k)->debug_info);
-						if(res == YES){
+					if(check_child_from_parent(parent_ptr, func_block->variable_list.at(k)->debug_info) == true){
+						bool res = cmp_offset(cons, func_block->variable_list.at(k)->debug_info);
+						if(res == true){
 							result = func_block->variable_list.at(k)->my_descriptor;
 							return result;
 						}

@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 /*include Vine*/
 #include "asm_program.h"
 #include "disasm-pp.h"
@@ -38,8 +40,8 @@ dvariable* check_loop_type(dvariable *var, Dwarf_Off type_offset){
 	return res;
 }
 
-BOOL check_artificial(Dwarf_Die die){
-	BOOL result = NO;
+bool check_artificial(Dwarf_Die die){
+	bool result = false;
 
 	int res;
 	Dwarf_Half type_tag;
@@ -52,15 +54,15 @@ BOOL check_artificial(Dwarf_Die die){
 	/*Get DW_AT_artificial*/
 	res = dwarf_attr(die, DW_AT_artificial, &attr, &error);
 	if (res == DW_DLV_OK){
-		result = YES;
+		result = true;
 		return result;
 	}
 
 	return result;
 }
 
-BOOL get_die_name(Dwarf_Die die, string &ret){
-	BOOL result = NO;
+bool get_die_name(Dwarf_Die die, string &ret){
+	bool result = false;
 
 	char *name = 0;
 	Dwarf_Error error = 0;
@@ -74,14 +76,14 @@ BOOL get_die_name(Dwarf_Die die, string &ret){
 
 	ret = std::string(name);
 	cout<<"get_die_name:"<<ret<<endl;
-	result = YES;
+	result = true;
 
 	return result;
 }
 
-BOOL get_die_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret, Dwarf_Off *ret_off){
+bool get_die_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret, Dwarf_Off *ret_off){
 	/*return the type die of die*/
-	BOOL result = NO;
+	bool result = false;
 	int res;
 	Dwarf_Error error;
 	Dwarf_Attribute attr;
@@ -121,22 +123,22 @@ BOOL get_die_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret, Dwarf_Off *ret
 	}
 	if(tag == DW_TAG_typedef || tag == DW_TAG_const_type || tag == DW_TAG_subroutine_type){
 		result = get_die_type(dbg, typeDie, &typeDie, &offset);
-		if(result == NO){
+		if(result == false){
 			return result;
 		}
 	}else if(tag == DW_TAG_enumeration_type){
-		result = NO;
+		result = false;
 		return result;
 	}
 
-	result = YES;
+	result = true;
 	*ret = typeDie;
 	*ret_off = offset;
 	return result;
 }
 
-BOOL get_die_loclist(Dwarf_Die die, vector<location *> &loc_list, vector<location *> &frame_base){
-	BOOL result = NO;
+bool get_die_loclist(Dwarf_Die die, vector<location *> &loc_list, vector<location *> &frame_base){
+	bool result = false;
 	Dwarf_Locdesc **llbuf;
 	Dwarf_Loc *locp;
 	int i, j;
@@ -232,13 +234,13 @@ BOOL get_die_loclist(Dwarf_Die die, vector<location *> &loc_list, vector<locatio
 		}
 	}
 
-	result = YES;
+	result = true;
 	return result;
 }
 
 //-------------------------------------------------------------------------------------------------------X
-BOOL get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
-	BOOL result = NO;
+bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
+	bool result = false;
 	Dwarf_Locdesc **llbuf;
 	Dwarf_Loc *locp;
 	int i, j;
@@ -318,12 +320,12 @@ BOOL get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
 		}
 	}
 
-	result = YES;
+	result = true;
 	return result;
 }
 
-BOOL get_die_size(Dwarf_Die typeDie, int *ret){
-	BOOL result;
+bool get_die_size(Dwarf_Die typeDie, int *ret){
+	bool result;
 
 	int res;
 	Dwarf_Half type_tag;
@@ -348,13 +350,13 @@ BOOL get_die_size(Dwarf_Die typeDie, int *ret){
 		return result;
 	}
 
-	result = YES;
+	result = true;
 	*ret = byte_size;
 	return result;
 }
 
-BOOL get_die_offset(Dwarf_Die typeDie, int *ret){
-	BOOL result = NO;
+bool get_die_offset(Dwarf_Die typeDie, int *ret){
+	bool result = false;
 	Dwarf_Locdesc *llbuf;
 	Dwarf_Loc *locp;
 	int i, j;
@@ -394,15 +396,15 @@ BOOL get_die_offset(Dwarf_Die typeDie, int *ret){
 	}
 
 	if(offset != -1){
-		result = YES;
+		result = true;
 		*ret = offset;
 	}
 	return result;
 
 }
 
-BOOL get_die_su(Dwarf_Die typeDie, sign_type_t *ret){
-	BOOL result = NO;
+bool get_die_su(Dwarf_Die typeDie, sign_type_t *ret){
+	bool result = false;
 	int res;
 	Dwarf_Unsigned s_u;
 	Dwarf_Attribute attr;
@@ -430,12 +432,12 @@ BOOL get_die_su(Dwarf_Die typeDie, sign_type_t *ret){
 		*ret = UNKNOW_T;
 	}
 
-	result = YES;
+	result = true;
 	return result;
 }
 
-BOOL get_array_size(Dwarf_Die typeDie, int *ret){
-	BOOL result = NO;
+bool get_array_size(Dwarf_Die typeDie, int *ret){
+	bool result = false;
 	int res = 0;
 	Dwarf_Die die_subrange = 0;
 	Dwarf_Unsigned array_size;
@@ -464,9 +466,9 @@ BOOL get_array_size(Dwarf_Die typeDie, int *ret){
 //---------------------------------------------------------------------------------------------------X
 
 //function: get tag of an DIE
-BOOL get_die_tag(Dwarf_Die die, Dwarf_Half *tag){
+bool get_die_tag(Dwarf_Die die, Dwarf_Half *tag){
 	int res;
-	BOOL result = NO;
+	bool result = false;
 	Dwarf_Error error = 0;
 	Dwarf_Half buf;
 
@@ -479,7 +481,7 @@ BOOL get_die_tag(Dwarf_Die die, Dwarf_Half *tag){
 		return result;
 	}
 
-	result = YES;
+	result = true;
 	*tag = buf;
 	return result;
 }
@@ -600,8 +602,8 @@ void customize_loclist(dvariable *var){
 
 //function: given register name and offset of a variable, return whether its the variable
 //represented by var
-BOOL cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
-	BOOL result = NO;
+bool cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
+	bool result = false;
 	int i;
 
 	for(i = 0; i < var->loclist.size(); i++){
@@ -612,8 +614,8 @@ BOOL cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 				/*get var type*/
 				int small_off = offset - loc->offset;
 				if(small_off >= 0){
-					if(loc->reg_name == regname && cmp_offset(small_off, var) == YES){
-						result = YES;
+					if(loc->reg_name == regname && cmp_offset(small_off, var) == true){
+						result = true;
 						break;
 					}
 				}
@@ -621,11 +623,11 @@ BOOL cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 			}else{
 				/*optimization location*/
 				/*check PC range*/
-				if(loc->pc_cmp(pc) == NO){
+				if(loc->pc_cmp(pc) == false){
 					continue;
 				}
 				if(loc->reg_name == regname && offset == loc->offset){
-					result = YES;
+					result = true;
 					break;
 				}
 			}
@@ -633,8 +635,8 @@ BOOL cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 //		else if(var->loclist.at(i)->loc_type == REG_LOC){
 //			//cout<<"compare ("<<regname<<","<<offset<<") and "<<var->loclist.at(i)->tostring()<<endl;
 //			reg_loc * loc = (reg_loc *)var->loclist.at(i);
-//			if(loc->reg_name == regname && cmp_offset(offset, var) == YES){
-//				result = YES;
+//			if(loc->reg_name == regname && cmp_offset(offset, var) == true){
+//				result = true;
 //				break;
 //			}
 //		}
@@ -644,11 +646,11 @@ BOOL cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 }
 
 //function: compare the given inside offset and inside offset of given variable
-BOOL cmp_offset(int in_offset, dvariable *var){
+bool cmp_offset(int in_offset, dvariable *var){
 	//cout<<"************************cmp_offset() begin******************************"<<endl;
 	//cout<<"IR_offset: "<<in_offset<<endl;
 	//cout<<"Variable: "<<var->var_name<<endl;
-	BOOL result = NO;
+	bool result = false;
 	int i, j;
 	vector<dvariable *>type_stack;
 	dvariable *buf = var;
@@ -715,7 +717,7 @@ BOOL cmp_offset(int in_offset, dvariable *var){
 	}
 
 	//cout<<"offset = variable_off"<<endl;
-	result = YES;
+	result = true;
 
 	return result;
 }
@@ -735,7 +737,7 @@ int handle_constant(unsigned long long offset){
 
 void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariable *> &var_list, vector<location *> &frame_base){
 	int res = 0;
-	BOOL result = NO;
+	bool result = false;
 	Dwarf_Die cur_die = 0;
 	Dwarf_Error error;
 
@@ -753,7 +755,7 @@ void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariabl
 			Dwarf_Off off_type_cur = 0;
 			Dwarf_Die die_type_cur = 0;
 			result = get_die_type(dbg, cur_die, &die_type_cur, &off_type_cur);
-			if(result == YES && source->var_name!="" && source->loclist.size()>0){
+			if(result == true && source->var_name!="" && source->loclist.size()>0){
 				Dwarf_Half cur_type_tag = 0;
 				get_die_tag(die_type_cur, &cur_type_tag);
 				switch(cur_type_tag){

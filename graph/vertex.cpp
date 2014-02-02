@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graphviz.hpp>
 #include <boost/graph/breadth_first_search.hpp>
@@ -52,7 +54,7 @@ void Pointed::Add_into_list(dbase *debug_info){
 	if(this->debug_info_list.size() == 0){
 		this->debug_info_list.push_back(debug_info);
 	}else{
-		if(this->debug_info_list.at(0)->cmp_type(debug_info) == YES){
+		if(this->debug_info_list.at(0)->cmp_type(debug_info) == true){
 			this->debug_info_list.push_back(debug_info);
 		}else{
 			perror("This pointer is invalid for this type, cannot push");
@@ -60,9 +62,9 @@ void Pointed::Add_into_list(dbase *debug_info){
 	}
 }
 
-BOOL Pointed::cmp_ptr_type(dvariable * ptr){
-	BOOL result = NO;
-	if(this->debug_info_list.at(0)->cmp_type(ptr) == YES){
+bool Pointed::cmp_ptr_type(dvariable * ptr){
+	bool result = false;
+	if(this->debug_info_list.at(0)->cmp_type(ptr) == true){
 		/*Check whether in the same structure*/
 		/*If yes, then not treated as the same type*/
 //		dvariable *myparent = this->debug_info_list.at(0)->parent;
@@ -70,7 +72,7 @@ BOOL Pointed::cmp_ptr_type(dvariable * ptr){
 //		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
 //			result = YES;
 //		}
-		result = YES;
+		result = true;
 	}
 	return result;
 }
@@ -120,16 +122,16 @@ void pointer_info::print_copylist(){
 
 pointer_list::pointer_list(){}
 
-BOOL pointer_list::add_pointer(dptr *debug_info){
+bool pointer_list::add_pointer(dptr *debug_info){
 	int i;
-	BOOL res = NO;
+	bool res = false;
 	pointer_info *p_info = new pointer_info(debug_info);
 	for(i = 0; i < this->plist.size(); i++){
-		if(check_child(p_info->debug_info, this->plist.at(i)->debug_info) == YES){
+		if(check_child(p_info->debug_info, this->plist.at(i)->debug_info) == true){
 			/*this is a parent of plist[i]*/
 			/*add plist[i] to this.list*/
 			p_info->child_list.push_back(this->plist.at(i));
-		}else if(check_child(this->plist.at(i)->debug_info, p_info->debug_info) == YES){
+		}else if(check_child(this->plist.at(i)->debug_info, p_info->debug_info) == true){
 			/*this is a child of plist[i]*/
 			/*add this to plist[i].list*/
 			this->plist.at(i)->child_list.push_back(p_info);
@@ -139,7 +141,7 @@ BOOL pointer_list::add_pointer(dptr *debug_info){
 	/*Check duplicate of p_info itself*/
 	if(check_plist(p_info->debug_info, this->plist) == -1){
 		this->plist.push_back(p_info);
-		res = YES;
+		res = true;
 	}
 
 	return res;
@@ -168,15 +170,15 @@ void pointer_list::print_copylists(){
 //Common utils
 
 //check whether var_c is a child of var_p in debug_info structure
-BOOL check_child(dvariable *var_p, dvariable *var_c){
-	BOOL res = NO;
+bool check_child(dvariable *var_p, dvariable *var_c){
+	bool res = false;
 
 	//c->p
 	dvariable *buf = var_c;
 	while(buf != 0){
 		buf = buf->parent;
 		if(buf == var_p){
-			res = YES;
+			res = true;
 			break;
 		}
 	}
@@ -184,16 +186,16 @@ BOOL check_child(dvariable *var_p, dvariable *var_c){
 	return res;
 }
 
-BOOL check_child_from_parent(dvariable *var_p, dvariable *var_c){
+bool check_child_from_parent(dvariable *var_p, dvariable *var_c){
 	//p->c
 
-	BOOL res = NO;
+	bool res = false;
 	if(var_p == 0){
 		return res;
 	}
 
 	if(var_p == var_c){
-		res = YES;
+		res = true;
 		return res;
 	}
 
@@ -201,7 +203,7 @@ BOOL check_child_from_parent(dvariable *var_p, dvariable *var_c){
 	switch(ptype){
 	case DVAR_ARRAY:{
 		darray *buf = (darray *)var_p;
-		if(buf->leaf != YES){
+		if(buf->leaf != true){
 			res = check_child_from_parent(buf->var, var_c);
 		}
 		break;
@@ -210,7 +212,7 @@ BOOL check_child_from_parent(dvariable *var_p, dvariable *var_c){
 		int i;
 		dstruct *buf = (dstruct *)var_p;
 		for(i = 0; i < buf->member_list.size(); i++){
-			if(buf->member_list.at(i)->leaf != YES){
+			if(buf->member_list.at(i)->leaf != true){
 				res = check_child_from_parent(buf->member_list.at(i), var_c);
 			}
 		}
@@ -218,7 +220,7 @@ BOOL check_child_from_parent(dvariable *var_p, dvariable *var_c){
 	}
 	case DVAR_POINTER:{
 		dptr *buf = (dptr *)var_p;
-		if(buf->leaf != YES){
+		if(buf->leaf != true){
 			res = check_child_from_parent(buf->var, var_c);
 		}
 		break;

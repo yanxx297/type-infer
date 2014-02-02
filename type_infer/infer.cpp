@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <set>
 #include <utility>
+#include <stdbool.h>
 
 /*include libdwarf*/
 #include "dwarf.h"
@@ -57,7 +58,7 @@ void dfs_min_cut(Graph::vertex_descriptor src, func_vertex_ptr func_block, Graph
 	boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
 
 	g_color[src] = boost::red_color;
-	g_visited[src] = YES;
+	g_visited[src] = true;
 
 	if(g_vet[src] == VARIABLE){
 		func_block->variable_list.at(g_id[src])->infered_su = SIGNED_T;
@@ -75,7 +76,7 @@ void dfs_min_cut(Graph::vertex_descriptor src, func_vertex_ptr func_block, Graph
 //	walk through children, recursively
     boost::graph_traits<Graph>::edge_iterator ei, ei_end;
     for (tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei){
-    	if(source(*ei, g) == src && g_visited[target(*ei, g)]!= YES){
+    	if(source(*ei, g) == src && g_visited[target(*ei, g)]!= true){
     		if(g_res[*ei] > 0){
     			dfs_min_cut(target(*ei, g), func_block, g);
     		}
@@ -115,14 +116,14 @@ int reg_name_to_dwop(Temp * tmp){
 }
 
 //Given 2 nodes of an edge, check whether this edge is already in this graph g.
-BOOL check_duplicated_edge(int src_node, int des_node, Graph &g){
-	BOOL result = NO;
+bool check_duplicated_edge(int src_node, int des_node, Graph &g){
+	bool result = false;
 
     boost::graph_traits<Graph>::edge_iterator ei, ei_end;
     for (tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei){
     	if(source(*ei, g) == src_node &&
     			target(*ei, g) == des_node){
-    		result = YES;
+    		result = true;
     	}
     }
 	return result;
@@ -150,7 +151,7 @@ Traits::edge_descriptor add_edge_with_cap(Traits::vertex_descriptor &v1,
                                 Graph &g){
 //	Check duplicated edge
 	boost::property_map < Graph, boost::edge_reverse_t >::type rev = boost::get(boost::edge_reverse, g);
-	if(check_duplicated_edge(v1, v2, g) == NO &&
+	if(check_duplicated_edge(v1, v2, g) == false &&
 			v1 != v2){
 		  Traits::edge_descriptor e1 = add_edge(v1, v2, g).first;
 		  Traits::edge_descriptor e2 = add_edge(v2, v1, g).first;
@@ -165,8 +166,8 @@ Traits::edge_descriptor add_edge_with_cap(Traits::vertex_descriptor &v1,
 		  rev[e2] = e1;
 
 		  boost::property_map < Graph, visedge_type_t >::type g_evis = boost::get(visedge_type_t(), g);
-		  g_evis[e1] = YES;
-		  g_evis[e2] = NO;
+		  g_evis[e1] = true;
+		  g_evis[e2] = false;
 	}
 }
 
@@ -178,7 +179,7 @@ Graph::vertex_descriptor add_default_vertex(Graph &g, sign_type_t su_type){
 	boost::property_map<Graph, visible_type_t>::type g_vi = boost::get(visible_type_t(), g);
 
 	g_su[vtx] = su_type;
-	g_vi[vtx] = YES;
+	g_vi[vtx] = true;
 	return vtx;
 }
 
@@ -209,12 +210,12 @@ int check_duplicate_operation(func_vertex_ptr func_block, Operation *op){
 					}else{
 						int flag = 0;
 						if(((Bin_Operation *)op)->operand_l == -1){
-							if(compare_exp(((Bin_Operation *)op)->exp->lhs,((Bin_Operation *)func_block->op_list.at(i))->exp->lhs) == NO){
+							if(compare_exp(((Bin_Operation *)op)->exp->lhs,((Bin_Operation *)func_block->op_list.at(i))->exp->lhs) == false){
 								flag = 1;
 							}
 						}
 						if(((Bin_Operation *)op)->operand_r == -1){
-							if(compare_exp(((Bin_Operation *)op)->exp->rhs,((Bin_Operation *)func_block->op_list.at(i))->exp->rhs) == NO){
+							if(compare_exp(((Bin_Operation *)op)->exp->rhs,((Bin_Operation *)func_block->op_list.at(i))->exp->rhs) == false){
 								flag = 1;
 							}
 						}
@@ -261,12 +262,12 @@ int search_by_func_name(func_vertex_ptr func_block, fblock_ptr *vine_ir_block){
 }
 
 /*Tell me whether v_des is a node of variable by traveling through variable vector*/
-BOOL is_var(func_vertex_ptr func_block, Graph::vertex_descriptor v_des){
-	BOOL res = NO;
+bool is_var(func_vertex_ptr func_block, Graph::vertex_descriptor v_des){
+	bool res = false;
 	int i;
 	for(i = 0; i < func_block->variable_list.size(); i++){
 		if(func_block->variable_list.at(i)->my_descriptor == v_des){
-			res = YES;
+			res = true;
 			break;
 		}
 	}
@@ -291,7 +292,7 @@ int var_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
 		case BINOP:{
 			for(i = 0; i < func_block->variable_list.size(); i++){
 				dvariable *dvar = func_block->variable_list.at(i)->debug_info;
-				if(dvar->cmp_loc(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == YES){
+				if(dvar->cmp_loc(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true){
 					result = func_block->variable_list.at(i)->my_descriptor;
 					break;
 				}
@@ -313,15 +314,15 @@ int var_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
 }
 
 //Return whether reg_tmp is a flag register
-BOOL is_flag(Tmp_s *reg_tmp){
-	BOOL res = NO;
+bool is_flag(Tmp_s *reg_tmp){
+	bool res = false;
 	int i;
 	if(reg_tmp->name == str_reg[EFLAGS]){
-		res = YES;
+		res = true;
 	}else{
 		for(i = R_CF; i <= R_ACFLAG; i++){
 			if(reg_tmp->name == str_reg[i]){
-				res = YES;
+				res = true;
 				break;
 			}
 		}
@@ -338,7 +339,7 @@ int push_register(func_vertex_ptr func_block, Tmp_s *reg_tmp, Graph& g){
 	int i;
 
 	//Don't add flag
-	if(is_flag(reg_tmp)==NO){
+	if(is_flag(reg_tmp)==false){
 		for(i = 0; i < func_block->reg_list.size(); i++){
 			if(((Tmp_s *)func_block->reg_list.at(i)->reg_info)->index == reg_tmp->index){
 				result = i;
@@ -553,9 +554,9 @@ Graph::vertex_descriptor node_searcher(func_vertex_ptr func_list, int block, int
 
 //Looking for the defination of target starting from the given position
 //return the Exp * of the exp equaling to target
-BOOL def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, Tmp_s *target, Exp *&res){
+bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, Tmp_s *target, Exp *&res){
 	int i, j;
-	BOOL result = NO;
+	bool result = false;
 	for(i = block_no; i>0; i--){
 		for(j = (i == block_no? stmt_no: (vine_ir_block->block_list[i]->blen-1)); j > 0; j--){
 			if(vine_ir_block->block_list[i]->block[j]->stmt_type == MOVE){
@@ -564,7 +565,7 @@ BOOL def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, Tmp_s *ta
 						if(((Tmp_s *)(Temp *)((Move *)vine_ir_block->block_list[i]->block[j])->lhs)->index == target->index ||
 								((Tmp_s *)(Temp *)((Move *)vine_ir_block->block_list[i]->block[j])->lhs)->name == target->name){
 							res = ((Move *)vine_ir_block->block_list[i]->block[j])->rhs;
-							result = YES;
+							result = true;
 							return result;
 						}
 					}
@@ -578,15 +579,15 @@ BOOL def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, Tmp_s *ta
 
 /*Look for the defination of SF*/
 /*Return the corresponding nodes of var/reg/exp in the equation of SF*/
-BOOL sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g){
+bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g){
 	Exp *def;
-	BOOL result = NO;
+	bool result = false;
 	Graph::vertex_descriptor opr_l = -1;
 	Graph::vertex_descriptor opr_r = -1;
 	if(get_reg_position(exp->name) == -1){
 		return result;
 	}else{
-		if(def_searcher(vine_ir_block, block_no, stmt_no, ((Tmp_s *)exp), def) == NO){
+		if(def_searcher(vine_ir_block, block_no, stmt_no, ((Tmp_s *)exp), def) == false){
 			return result;
 		}else{
 			//Now the defination of SF is in def
@@ -597,12 +598,12 @@ BOOL sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_n
 			while(tmp->exp_type == BINOP){
 				if(((BinOp *)tmp)->binop_type == MINUS){
 					//tmp = a + b
-					result = YES;
+					result = true;
 					break;
 				}else{
 					if((((BinOp *)tmp)->lhs->exp_type == BINOP && ((BinOp *)tmp)->rhs->exp_type == BINOP)||
 							(((BinOp *)tmp)->lhs->exp_type != BINOP && ((BinOp *)tmp)->rhs->exp_type != BINOP)){
-						result = NO;
+						result = false;
 						return result;
 					}else if(((BinOp *)tmp)->lhs->exp_type == BINOP && ((BinOp *)tmp)->rhs->exp_type != BINOP){
 						tmp = ((BinOp *)tmp)->lhs;
@@ -645,15 +646,15 @@ BOOL sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_n
 //Similar to sf_handler except:
 //1. CF = a<b
 //2. unsigned
-BOOL cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g){
+bool cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g){
 	Exp *def;
-	BOOL result = NO;
+	bool result = false;
 	Graph::vertex_descriptor opr_l = -1;
 	Graph::vertex_descriptor opr_r = -1;
 	if(get_reg_position(exp->name) == -1){
 		return result;
 	}else{
-		if(def_searcher(vine_ir_block, block_no, stmt_no, ((Tmp_s *)exp), def) == NO){
+		if(def_searcher(vine_ir_block, block_no, stmt_no, ((Tmp_s *)exp), def) == false){
 			return result;
 		}else{
 			//Now the defination of CF is in def
@@ -663,12 +664,12 @@ BOOL cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_n
 			while(tmp->exp_type == BINOP){
 				if(((BinOp *)tmp)->binop_type == LT){
 					//tmp = a < b
-					result = YES;
+					result = true;
 					break;
 				}else{
 					if((((BinOp *)tmp)->lhs->exp_type == BINOP && ((BinOp *)tmp)->rhs->exp_type == BINOP)||
 							(((BinOp *)tmp)->lhs->exp_type != BINOP && ((BinOp *)tmp)->rhs->exp_type != BINOP)){
-						result = NO;
+						result = false;
 						return result;
 					}else if(((BinOp *)tmp)->lhs->exp_type == BINOP && ((BinOp *)tmp)->rhs->exp_type != BINOP){
 						tmp = ((BinOp *)tmp)->lhs;
@@ -860,7 +861,7 @@ void handle_shr(func_vertex_ptr func_block, int descriptor, Graph& g){
 	Stmt *tmp = func_block->stmt_block->block_list[block]->block[stmt];
 	if(tmp->stmt_type == MOVE){
 		Move *tmp_mv = (Move *)tmp;
-		if(is_tmps(tmp_mv->lhs) == YES){
+		if(is_tmps(tmp_mv->lhs) == true){
 			Tmp_s * tmps = (Tmp_s *)tmp_mv->lhs;
 			if(is_flag(tmps)){
 				return;
@@ -1000,11 +1001,11 @@ void check_cjmp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Exp *cond, 
 	}
 }
 
-BOOL compare_mem(Mem *former, Mem *latter){
+bool compare_mem(Mem *former, Mem *latter){
 	//Check whether the 2 Mem* represent the same location
-	BOOL result = NO;
+	bool result = false;
 	if(former->addr->exp_type != latter->addr->exp_type){
-		result = NO;
+		result = false;
 	}else{
 		if(former->addr->exp_type == BINOP){
 			if(((BinOp *)former->addr)->lhs->exp_type == TEMP &&
@@ -1013,14 +1014,14 @@ BOOL compare_mem(Mem *former, Mem *latter){
 					((BinOp *)latter->addr)->rhs->exp_type == CONSTANT){
 				if(((Tmp_s *)((BinOp *)former->addr)->lhs)->index == ((Tmp_s *)((BinOp *)latter->addr)->lhs)->index &&
 						((Constant *)((BinOp *)former->addr)->rhs)->val == ((Constant *)((BinOp *)latter->addr)->rhs)->val){
-					result = YES;
+					result = true;
 				}
 			}
 		}else if(former->addr->exp_type == TEMP){
 			if(get_reg_position(((Temp *)former->addr)->name) != -1 &&
 					get_reg_position(((Temp *)latter->addr)->name) != -1 ){
 				if(((Tmp_s *)former->addr)->index == ((Tmp_s *)latter->addr)->index){
-					result = YES;
+					result = true;
 				}
 			}
 		}
@@ -1032,8 +1033,8 @@ BOOL compare_mem(Mem *former, Mem *latter){
 //1-mem[] whose corresponding variable node
 //2-constant, which is not included in graoh by default
 //3-?????
-BOOL compare_exp(Exp *former, Exp *latter){
-	BOOL result = NO;
+bool compare_exp(Exp *former, Exp *latter){
+	bool result = false;
 	if(former->exp_type != latter->exp_type){
 		return result;
 	}else{
@@ -1045,7 +1046,7 @@ BOOL compare_exp(Exp *former, Exp *latter){
 		}
 		case CONSTANT:{
 			if(((Constant *)former)->val == ((Constant *)latter)->val){
-				result = YES;
+				result = true;
 			}
 			break;
 		}

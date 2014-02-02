@@ -9,10 +9,10 @@ public:
 	dvariable(dvariable &source);//copy from source
 	void print_dvar();
 	virtual void print_me(){};
-	BOOL cmp_type(dvariable *input);
+	bool cmp_type(dvariable *input);
 	virtual ~dvariable(){};
-	BOOL cmp_loc(Exp *exp, address_t pc);
-	BOOL cmp_reg(Exp *exp, address_t pc);
+	bool cmp_loc(Exp *exp, address_t pc);
+	bool cmp_reg(Exp *exp, address_t pc);
 
 	/*information that available in variable DIE or DIEs before typeDIE*/
 	string var_name;
@@ -24,7 +24,7 @@ public:
 	int s_offset; // 0 by default, offset if in structure
 	DVAR_TYPE_T var_struct_type;//DVAR_UN by default
 	dvariable *parent;// 0(NULL) by default
-	BOOL leaf;//whether this is a lead node in debugging info tree
+	bool leaf;//whether this is a lead node in debugging info tree
 };
 
 class dbase: public dvariable{
@@ -59,7 +59,7 @@ class dptr: public dvariable{
 public:
 	dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent);
 	void print_me();
-	BOOL cmp_ptr_type(dptr *input);
+	bool cmp_ptr_type(dptr *input);
 
 
 	dvariable *var;

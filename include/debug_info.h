@@ -22,7 +22,7 @@ struct pointed_type{
 	string type_name;
 	//Tmp_s *addr;//reg or [reg + offset]
 	vector<Tmp_s *> addr_list;
-	BOOL addr_set;//Whether addr has been set///////////NO USE
+	bool addr_set;//Whether addr has been set///////////NO USE
 };
 
 struct var_info{
@@ -51,7 +51,7 @@ static void read_cu_list(Dwarf_Debug dbg);
 static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level);
 static void get_die_and_siblings(Dwarf_Debug dbg, Dwarf_Die in_die,
 		int in_level);
-static BOOL get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_info *&ret);
+static bool get_var(Dwarf_Debug dbg, Dwarf_Die print_me, int level, struct var_info *&ret);
 
 static void print_debug_info(vector<subprog> dbg);
 static struct var_info *get_array_member(Dwarf_Debug dbg, Dwarf_Die print_me,

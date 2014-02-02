@@ -56,13 +56,13 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
 		boost::property < signed_unsigend_type_t, sign_type_t,
 		boost::property < vertex_exp_type_t, vertex_type_t,
 		boost::property < identity_in_list_type_t, int,
-		boost::property < visited_type_t, BOOL,
-		boost::property < visible_type_t, BOOL > > > > > > > > > >,
+		boost::property < visited_type_t, bool,
+		boost::property < visible_type_t, bool > > > > > > > > > >,
 
 		boost::property < boost::edge_capacity_t, EdgeWeightType,
 		boost::property < boost::edge_residual_capacity_t, EdgeWeightType,
 		boost::property < boost::edge_reverse_t, Traits::edge_descriptor,
-		boost::property < visedge_type_t, BOOL > > > > > Graph;
+		boost::property < visedge_type_t, bool > > > > > Graph;
 typedef boost::graph_traits<Graph>::vertex_iterator vertex_iter;
 
 typedef boost::adjacency_list_traits < boost::vecS, boost::vecS, boost::undirectedS> U_Traits;
@@ -75,8 +75,8 @@ typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS,
 		boost::property < signed_unsigend_type_t, sign_type_t,
 		boost::property < vertex_exp_type_t, vertex_type_t,
 		boost::property < identity_in_list_type_t, int,
-		boost::property < visited_type_t, BOOL,
-		boost::property < visible_type_t, BOOL >  > > > > > > > > > > Undirect_Graph;
+		boost::property < visited_type_t, bool,
+		boost::property < visible_type_t, bool >  > > > > > > > > > > Undirect_Graph;
 
 typedef boost::graph_traits<Undirect_Graph>::vertex_descriptor vertex_iter_udi;
 typedef boost::graph_traits<Undirect_Graph>::vertices_size_type vertex_index_udi;
@@ -103,7 +103,7 @@ class Pointed: public vertex{
 public:
 	Pointed(dbase *debug_info, Graph::vertex_descriptor descriptor, string name);
 	void Add_into_list(dbase *debug_info);
-	BOOL cmp_ptr_type(dvariable * ptr);
+	bool cmp_ptr_type(dvariable * ptr);
 
 	vector <dbase *> debug_info_list;
 	string ptr_name;
@@ -156,7 +156,7 @@ public:
 class pointer_list{
 public:
 	pointer_list();
-	BOOL add_pointer(dptr *debug_info);
+	bool add_pointer(dptr *debug_info);
 	void print_plist();
 	int getsize();
 	void print_copylists();
@@ -197,8 +197,8 @@ typedef func_vertex_block * func_vertex_ptr;
 //int search_op(func_vertex_ptr func_list, int block, int stmt, Exp *target);
 //int search_reg(func_vertex_ptr func_list, Tmp_s *target);
 
-BOOL check_child(dvariable *var_p, dvariable *var_c);
-BOOL check_child_from_parent(dvariable *var_p, dvariable *var_c);
+bool check_child(dvariable *var_p, dvariable *var_c);
+bool check_child_from_parent(dvariable *var_p, dvariable *var_c);
 
 #endif /* NODE_H_ */
 

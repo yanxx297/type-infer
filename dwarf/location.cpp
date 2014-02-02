@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 /*include Vine*/
 #include "asm_program.h"
 #include "disasm-pp.h"
@@ -28,18 +30,18 @@ location::location(location *source)
 :loc_type(source->loc_type), high_pc(source->high_pc), low_pc(source->low_pc), piece_offset(source->piece_offset)
 {}
 
-BOOL location::pc_cmp(address_t addr){
-	BOOL result = NO;
+bool location::pc_cmp(address_t addr){
+	bool result = false;
 	if(addr <= this->high_pc && addr >= this->low_pc ){
-		result = YES;
+		result = true;
 	}
 	return result;
 }
 
-BOOL offset_loc::loc_cmp(Exp *exp, address_t addr){
-	BOOL result = NO;
+bool offset_loc::loc_cmp(Exp *exp, address_t addr){
+	bool result = false;
 	Tmp_s *t_reg;
-	if(exp->exp_type != MEM || this->pc_cmp(addr) == NO){
+	if(exp->exp_type != MEM || this->pc_cmp(addr) == false){
 		return result;
 	}
 	Exp * t_addr = ((Mem *)exp)->addr;
@@ -49,10 +51,10 @@ BOOL offset_loc::loc_cmp(Exp *exp, address_t addr){
 
 		BinOp *t_binop = (BinOp *)t_addr;
 		int t_off;
-		if(is_tmps(t_binop->lhs) == YES && t_binop->rhs->exp_type == CONSTANT){
+		if(is_tmps(t_binop->lhs) == true && t_binop->rhs->exp_type == CONSTANT){
 			t_reg = (Tmp_s *)t_binop->lhs;
 			t_off = ((Constant *)t_binop->rhs)->val;
-		}else if(is_tmps(t_binop->rhs) == YES && t_binop->lhs->exp_type == CONSTANT){
+		}else if(is_tmps(t_binop->rhs) == true && t_binop->lhs->exp_type == CONSTANT){
 			t_reg = (Tmp_s *)t_binop->rhs;
 			t_off = ((Constant *)t_binop->lhs)->val;
 		}else{
@@ -60,20 +62,20 @@ BOOL offset_loc::loc_cmp(Exp *exp, address_t addr){
 		}
 
 		if(this->reg_name == t_reg->name && this->offset == t_off){
-			result = YES;
+			result = true;
 			return result;
 		}
 	}else if(t_addr->exp_type == TEMP){
 		//mem[reg], offset is 0
 
-		if(is_tmps(t_addr) == YES){
+		if(is_tmps(t_addr) == true){
 			t_reg = (Tmp_s *)t_addr;
 		}else{
 			return result;
 		}
 
 		if(this->reg_name == t_reg->name){
-			result = YES;
+			result = true;
 			return result;
 		}
 	}
@@ -84,7 +86,7 @@ BOOL offset_loc::loc_cmp(Exp *exp, address_t addr){
 offset_loc::offset_loc(Dwarf_Off original_off, Dwarf_Small original_reg, address_t high, address_t low, int p_offset)
 :location(OFFSET_LOC, high, low, p_offset)
 {
-	BOOL result = NO;
+	bool result = false;
 	string name = "";
 	this->loc_reg_number = original_reg;
 	this->offset = original_off; //% 18446744069414584320;
@@ -103,9 +105,9 @@ string offset_loc::tostring(){
 	return res;
 }
 
-BOOL addr_loc::loc_cmp(Exp *exp, address_t addr){
-	BOOL result = NO;
-	if(exp->exp_type != MEM || this->pc_cmp(addr) == NO){
+bool addr_loc::loc_cmp(Exp *exp, address_t addr){
+	bool result = false;
+	if(exp->exp_type != MEM || this->pc_cmp(addr) == false){
 		return result;
 	}
 
@@ -113,7 +115,7 @@ BOOL addr_loc::loc_cmp(Exp *exp, address_t addr){
 	if(t_addr->exp_type == CONSTANT){
 		Constant *t_con = (Constant *)t_addr;
 		if(t_con->val == this->addr){
-			result = YES;
+			result = true;
 			return result;
 		}
 	}
@@ -138,16 +140,16 @@ string addr_loc::tostring(){
 	return res;
 }
 
-BOOL reg_loc::loc_cmp(Exp *exp, address_t addr){
-	BOOL result = NO;
-	if(this->pc_cmp(addr) == NO){
+bool reg_loc::loc_cmp(Exp *exp, address_t addr){
+	bool result = false;
+	if(this->pc_cmp(addr) == false){
 		return result;
 	}
 
-	if(is_tmps(exp) == YES){
+	if(is_tmps(exp) == true){
 		Tmp_s *t_reg = (Tmp_s *)exp;
 		if(t_reg->name == this->reg_name){
-			result = YES;
+			result = true;
 			return result;
 		}
 	}
@@ -160,7 +162,7 @@ reg_loc::reg_loc(Dwarf_Small original_reg, address_t high, address_t low, int p_
 :location(REG_LOC, high, low, p_offset)
 {
 	this->store_reg_name = original_reg;
-	if(dwop_to_regname(this->store_reg_name, this->reg_name) == NO){
+	if(dwop_to_regname(this->store_reg_name, this->reg_name) == false){
 		this->reg_name = "";
 	}
 }
@@ -176,8 +178,8 @@ string reg_loc::tostring(){
 	return res;
 }
 
-BOOL dwop_to_regname(Dwarf_Small input, string &ret){
-	BOOL result = NO;
+bool dwop_to_regname(Dwarf_Small input, string &ret){
+	bool result = false;
 	int loc = -1;
 
 	if(input >= DW_OP_reg0 && input <= DW_OP_reg31){
@@ -189,7 +191,7 @@ BOOL dwop_to_regname(Dwarf_Small input, string &ret){
 	//cout<<"loc = "<<loc<<endl;
 	if(loc != -1){
 		ret = str_reg[loc];
-		result = YES;
+		result = true;
 	}
 	return result;
 }

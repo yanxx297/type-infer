@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <set>
 #include <utility>
+#include <stdbool.h>
 
 /*include libdwarf*/
 #include "dwarf.h"
@@ -52,7 +53,7 @@ void reset_visited(Graph &g){
 
     pair<vertex_iter, vertex_iter> vp;
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
-    	g_visited[*vp.first] = NO;
+    	g_visited[*vp.first] = false;
     }
 }
 
@@ -62,37 +63,37 @@ void reset_visible(Graph &g){
 
     pair<vertex_iter, vertex_iter> vp;
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
-    	g_vis[*vp.first] = NO;
+    	g_vis[*vp.first] = false;
     }
 }
 
 //check each node in DFS approach
-//if this node / any child tree of this node include the destination node, print this node, and return YES back
-BOOL print_node(Graph::vertex_descriptor current_node,Graph::vertex_descriptor des, Graph &g){
-	BOOL flag = NO;//flag = yes if any child tree include des
+//if this node / any child tree of this node include the destination node, print this node, and return true back
+bool print_node(Graph::vertex_descriptor current_node,Graph::vertex_descriptor des, Graph &g){
+	bool flag = false;//flag = yes if any child tree include des
 	boost::property_map<Graph, visited_type_t>::type g_visited = boost::get(visited_type_t(), g);
 	boost::property_map<Graph, visible_type_t>::type g_vis = boost::get(visible_type_t(), g);
 
-	g_visited[current_node] = YES;
+	g_visited[current_node] = true;
 
 	//	walk through children, recursively
 	    boost::graph_traits<Graph>::edge_iterator ei, ei_end;
 
 	    if(current_node == des){
-	    	g_vis[current_node] = YES;
-	    	flag = YES;
+	    	g_vis[current_node] = true;
+	    	flag = true;
 	    }else{
 		    for (tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei){
-		    	if(source(*ei, g) == current_node && g_visited[target(*ei, g)]!= YES){
-		    		BOOL res = print_node(target(*ei, g), des, g);
-		    		if(res == YES){
-		    			flag = YES;
+		    	if(source(*ei, g) == current_node && g_visited[target(*ei, g)]!= true){
+		    		bool res = print_node(target(*ei, g), des, g);
+		    		if(res == true){
+		    			flag = true;
 		    		}
 		    	}
 		    }
 
-		    if(flag == YES){
-		    	g_vis[current_node] = YES;
+		    if(flag == true){
+		    	g_vis[current_node] = true;
 		    }
 	    }
 

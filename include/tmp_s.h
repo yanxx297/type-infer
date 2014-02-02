@@ -40,5 +40,5 @@ public:
 };
 
 
-BOOL is_tmps(Exp *input);
+bool is_tmps(Exp *input);
 #endif /* EXP_S_H_ */

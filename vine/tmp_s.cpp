@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <set>
+#include <stdbool.h>
 
 #include "asm_program.h"
 #include "disasm-pp.h"
@@ -117,12 +118,12 @@ void Phi_s::destroy( Phi_s *expr )
 }
 
 //check whether a Exp is a Tmp_s
-BOOL is_tmps(Exp *input){
-	BOOL res = NO;
+bool is_tmps(Exp *input){
+	bool res = false;
 	if(input->exp_type == TEMP){
 		Temp *tmp = (Temp *)input;
 		if(get_reg_position(tmp->name) != -1){
-			res = YES;
+			res = true;
 		}
 	}
 

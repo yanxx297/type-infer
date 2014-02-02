@@ -5,6 +5,7 @@
 #include <set>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 /*include Vine*/
 #include "asm_program.h"
@@ -114,7 +115,7 @@ void remove_unrelated_nodes(func_vertex_ptr func_block, Undirect_Graph& g, Graph
     			ds.find_set(*vp.first) != ds.find_set(func_block->u_des)){
     		Graph::vertex_descriptor src = undi_to_dig(*vp.first, g, dig, func_block);
     		if(ug_vet[*vp.first] != VARIABLE && ug_vet[*vp.first] != POINTED){
-        		g_vi[src] = NO;
+        		g_vi[src] = false;
         		//printf("remove node %s\n", g_name[src].c_str());
     		}
 //    		else if(ug_vet[*vp.first] == VARIABLE){
@@ -173,9 +174,9 @@ void print_component(Undirect_Graph::vertex_descriptor &node, func_vertex_ptr fu
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
     	Graph::vertex_descriptor node_d = undi_to_dig(*vp.first, g, dig, func_block);
     	if(ds.find_set(*vp.first) != ds.find_set(node)){
-    		g_vi[node_d] = YES;
+    		g_vi[node_d] = true;
     	}else{
-    		g_vi[node_d] = NO;
+    		g_vi[node_d] = false;
     	}
     }
 }
@@ -377,7 +378,7 @@ void draw_var_graph(func_vertex_ptr func_block, Graph& g){
     pair<vertex_iter, vertex_iter> vp;
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
     	//fprintf(fp, "%d [label=\"%s\" vis:%d vet:%d];\n",*vp.first,g_name[*vp.first].c_str(),g_vi[*vp.first], g_vet[*vp.first]);
-    	if(g_vi[*vp.first] == YES){
+    	if(g_vi[*vp.first] == true){
         	if(g_vet[*vp.first] == S_NODE){
         		fprintf(fp, "%d [label=\"%s\", color=\"brown2\", style=\"filled\"];\n",*vp.first,g_name[*vp.first].c_str());
         	}else if(g_vet[*vp.first] == U_NODE){
@@ -418,9 +419,9 @@ void draw_var_graph(func_vertex_ptr func_block, Graph& g){
     boost::graph_traits<Graph>::edge_iterator ei, ei_end;
         for (tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei){
     	if(capacity[*ei] >0 &&
-    			g_evis[*ei] == YES &&
-    			g_vi[source(*ei, g)] == YES &&
-    			g_vi[target(*ei, g)] == YES){
+    			g_evis[*ei] == true &&
+    			g_vi[source(*ei, g)] == true &&
+    			g_vi[target(*ei, g)] == true){
     		fprintf(fp,"%d -> %d;\n",source(*ei, g), target(*ei, g));
     	}
     }
@@ -467,7 +468,7 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 	case DVAR_STRUCT:{
 		dstruct * stru = (dstruct *)var;
 		int i;
-		if(stru->leaf != YES){
+		if(stru->leaf != true){
 			for(i = 0; i < stru->member_list.size(); i++){
 				if(stru->member_list.at(i) != 0){
 					push_each_pointer(stru->member_list.at(i), func_list, g);
@@ -479,15 +480,15 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 	case DVAR_ARRAY:{
 		darray * arr = (darray *)var;
 		int i;
-		if(arr->var != 0 && arr->leaf != YES){
+		if(arr->var != 0 && arr->leaf != true){
 			push_each_pointer(arr->var, func_list, g);
 		}
 		break;
 	}
 	case DVAR_POINTER:{
 		dptr * ptr = (dptr *)var;
-		BOOL res_add = func_list->ptr_list.add_pointer(ptr);
-		if(ptr->var != 0 && ptr->leaf != YES && res_add == YES){
+		bool res_add = func_list->ptr_list.add_pointer(ptr);
+		if(ptr->var != 0 && ptr->leaf != true && res_add == true){
 			//Only continue adding child if this pointer is not duplicate
 			push_each_pointer(ptr->var, func_list, g);
 		}
@@ -530,7 +531,7 @@ void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g){
 	case DVAR_STRUCT:{
 		cout<<"check struct: "<<var->var_name<<endl;
 		dstruct * stru = (dstruct *)var;
-		if(stru->leaf != YES){
+		if(stru->leaf != true){
 			int i;
 			for(i = 0; i < stru->member_list.size(); i++){
 				if(stru->member_list.at(i) != 0){
@@ -543,7 +544,7 @@ void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g){
 	case DVAR_ARRAY:{
 		cout<<"check arr: "<<var->var_name<<endl;
 		darray * arr = (darray *)var;
-		if(arr->var != 0 && arr->leaf != YES){
+		if(arr->var != 0 && arr->leaf != true){
 			push_each_var(arr->var, func_list, g);
 		}
 		break;
@@ -732,7 +733,7 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 				int count;
 				for(count = 0; count < func_block->variable_list.size(); count ++){
 					dvariable *var = func_block->variable_list.at(count)->debug_info;
-					if(var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == YES){
+					if(var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true){
 						//cout<<func_block->stmt_block->block_list[block]->block[stmt]->tostring()<<endl;
 						add_edge_with_cap(vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
 					}
@@ -889,7 +890,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 
 }
 
-void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, BOOL ssaf){
+void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, bool ssaf){
 	int i, j, k;
 	fblock_ptr tmp;
 	tmp = transform_to_ssa(vine_blocks, prog, func_num);
@@ -906,7 +907,7 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 
 	printf("***********************handle function[%d] %s***********************\n", func_num, tmp->func->name.c_str());
 
-	if (ssaf == YES) {
+	if (ssaf == true) {
 		//    Write ssa version of vine ir into another file
 		FILE *ssair;
 		char filename[256];
@@ -1122,7 +1123,7 @@ main(int argc, char **argv)
     asm_program_t * asmprog;
     trans_to_vineir(argv[1], vine_blocks, asmprog);
     int func_num = -1;
-    BOOL ssaf_flag = NO;
+    bool ssaf_flag = false;
 
     for(count = 0; count < argc; count++){
     	if(strcmp(argv[count], "-single")==0 && (count+1)<argc){
@@ -1133,7 +1134,7 @@ main(int argc, char **argv)
 
     for(count = 0; count < argc; count++){
     	if(strcmp(argv[count], "-ssaf")==0){
-    		ssaf_flag = YES;
+    		ssaf_flag = true;
     		break;
     	}
     }

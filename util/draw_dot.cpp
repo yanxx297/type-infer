@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <utility>
+#include <stdbool.h>
 
 /*include Vine*/
 #include "asm_program.h"

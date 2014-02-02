@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 /*include Vine*/
 #include "asm_program.h"
 #include "disasm-pp.h"
@@ -21,8 +23,8 @@ extern "C"
 using namespace std;
 
 dvariable::dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> frame_base)
-:s_offset(0), var_struct_type(DVAR_UN), parent(0), leaf(NO){
-	BOOL res;
+:s_offset(0), var_struct_type(DVAR_UN), parent(0), leaf(false){
+	bool res;
 	int res_tag;
 	Dwarf_Half tag = 0;
 	Dwarf_Die die_type;
@@ -51,8 +53,8 @@ dvariable::dvariable(dvariable &source){
 	this->var_struct_type = source.var_struct_type;
 	this->parent = source.parent;
 
-	if(source.leaf == NO){
-		this->leaf == NO;
+	if(source.leaf == false){
+		this->leaf == false;
 	}
 
 	for(i = 0; i < source.loclist.size(); i++){
@@ -84,7 +86,7 @@ void dvariable::print_dvar(){
 		break;
 	}
 	}
-	if(this->leaf == YES){
+	if(this->leaf == true){
 		cout<<"Is a Leaf."<<endl;
 	}
 	cout<<"type off: 0x"<<hex<<this->var_type<<endl;
@@ -97,23 +99,23 @@ void dvariable::print_dvar(){
 	}
 }
 
-BOOL dvariable::cmp_type(dvariable *input){
-	BOOL result = NO;
+bool dvariable::cmp_type(dvariable *input){
+	bool result = false;
 	if(this->var_type == input->var_type){
 		if(this->parent == 0 || input->parent == 0){
-			result = YES;
+			result = true;
 		}else{
-			if(this->parent->cmp_type(input->parent) == YES){
-				result = YES;
+			if(this->parent->cmp_type(input->parent) == true){
+				result = true;
 			}
 		}
 	}
 	return result;
 }
 
-BOOL dvariable::cmp_loc(Exp *exp, address_t pc){
+bool dvariable::cmp_loc(Exp *exp, address_t pc){
 	//cout<<"\tlook for "<<exp->tostring()<<endl;
-	BOOL result = NO;
+	bool result = false;
 	if(exp->exp_type != MEM){
 		return result;
 	}
@@ -142,8 +144,8 @@ BOOL dvariable::cmp_loc(Exp *exp, address_t pc){
 		if(offset == -1){
 			return result;
 		}
-		if(cmp_offset_loc(regname, offset, pc, this) == YES){
-			result = YES;
+		if(cmp_offset_loc(regname, offset, pc, this) == true){
+			result = true;
 			//cout<<"\t\tfind "<<this->var_name<<endl;
 			return result;
 		}
@@ -151,8 +153,8 @@ BOOL dvariable::cmp_loc(Exp *exp, address_t pc){
 		string regname;
 		Temp *tmp = (Temp *)mem->addr;
 		regname = tmp->name;
-		if(cmp_offset_loc(regname, 0, pc, this) == YES){
-			result = YES;
+		if(cmp_offset_loc(regname, 0, pc, this) == true){
+			result = true;
 			return result;
 		}
 	}else if(mem->addr->exp_type == CONSTANT){
@@ -160,8 +162,8 @@ BOOL dvariable::cmp_loc(Exp *exp, address_t pc){
 		int i;
 		for(i = 0; i < this->loclist.size(); i++){
 			if(this->loclist.at(i)->loc_type == ADDR_LOC){
-				if(this->loclist.at(i)->loc_cmp(mem, pc) == YES){
-					result = YES;
+				if(this->loclist.at(i)->loc_cmp(mem, pc) == true){
+					result = true;
 					return result;
 				}
 			}
@@ -170,18 +172,18 @@ BOOL dvariable::cmp_loc(Exp *exp, address_t pc){
 	return result;
 }
 
-BOOL dvariable::cmp_reg(Exp *exp, address_t pc){
-	BOOL result = NO;
+bool dvariable::cmp_reg(Exp *exp, address_t pc){
+	bool result = false;
 	int i;
-	if(is_tmps(exp) != YES){
+	if(is_tmps(exp) != true){
 		return result;
 	}
 	Tmp_s *reg = (Tmp_s *)exp;
 	for(i = 0; i < this->loclist.size(); i++){
 		if(this->loclist.at(i)->loc_type == REG_LOC){
 			reg_loc * loc = (reg_loc *)this->loclist.at(i);
-			if(reg->name == loc->reg_name && loc->pc_cmp(pc) == YES){
-				result = YES;
+			if(reg->name == loc->reg_name && loc->pc_cmp(pc) == true){
+				result = true;
 				break;
 			}
 		}
@@ -238,7 +240,7 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 :dvariable(source)
 {
 	int res;
-	BOOL res_b;
+	bool res_b;
 	int i, j;
 	int size = 0;
 	Dwarf_Die die_member = 0;
@@ -277,7 +279,7 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 			Dwarf_Die die_member_type = 0;
 			Dwarf_Off off_member_type = 0;
 			res_b = get_die_type(dbg, die_member, &die_member_type, &off_member_type);
-			if(res_b == YES){
+			if(res_b == true){
 				Dwarf_Half tag_member_type = 0;
 				get_die_tag(die_member_type, &tag_member_type);
 
@@ -321,7 +323,7 @@ void dstruct::print_me(){
 	cout<<"*************************"<<endl;
 	this->print_dvar();
 	cout<<"struct size: "<<this->struct_length<<endl;
-	if(this->leaf != YES){
+	if(this->leaf != true){
 		for(i = 0; i < this->member_list.size(); i++){
 			this->member_list.at(i)->print_me();
 		}
@@ -333,7 +335,7 @@ void dstruct::print_me(){
 darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
 :dvariable(source)
 {
-	BOOL result = NO;
+	bool result = false;
 	int array_size = 0;
 	Dwarf_Die die_element_type = 0;
 	Dwarf_Off off_element_type = 0;
@@ -352,7 +354,7 @@ darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off
 
 	/*set array element (ptr)*/
 	result = get_die_type(dbg, die_type, &die_element_type, &off_element_type);
-	if(result == YES){
+	if(result == true){
 		Dwarf_Half tag_element_type = 0;
 		get_die_tag(die_element_type, &tag_element_type);
 		switch(tag_element_type){
@@ -387,7 +389,7 @@ void darray::print_me(){
 	cout<<"*************************"<<endl;
 	this->print_dvar();
 	cout<<"array size: "<<this->array_size<<endl;
-	if(this->leaf!= YES && this->var != 0){
+	if(this->leaf!= true && this->var != 0){
 		this->var->print_me();
 	}else{
 		cout<<"\tVoid array"<<endl;
@@ -398,7 +400,7 @@ void darray::print_me(){
 dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
 :dvariable(source)
 {
-	BOOL result = NO;
+	bool result = false;
 	Dwarf_Die die_target_type = 0;
 	Dwarf_Off off_target_type = 0;
 
@@ -415,12 +417,12 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 
 	/*set pointer's target*/
 	result = get_die_type(dbg, die_type, &die_target_type, &off_target_type);
-	if(result == YES){
+	if(result == true){
 		/*check whether this type already exist in debug_info*/
 		dvariable *tmp = check_loop_type(this, off_target_type);
 		if(tmp != 0){
 			this->var = tmp;
-			this->leaf = YES;
+			this->leaf = true;
 			return;
 		}
 
@@ -460,7 +462,7 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 void dptr::print_me(){
 	cout<<"*************************"<<endl;
 	this->print_dvar();
-	if(this->leaf != YES && this->var != 0){
+	if(this->leaf != true && this->var != 0){
 		this->var->print_me();
 	}else{
 		if(this->var == 0){
@@ -528,7 +530,7 @@ program::program(Dwarf_Debug dbg){
 				subprogram * subprog = new subprogram(dbg, die_cu_child);
 
 				/*no name/artificial -> don't push into stack*/
-				if(subprog->name == "" || check_artificial(die_cu_child) == YES){
+				if(subprog->name == "" || check_artificial(die_cu_child) == true){
 					break;
 				}
 
@@ -538,12 +540,12 @@ program::program(Dwarf_Debug dbg){
 			case DW_TAG_variable:{
 				//printf("\t\tDW_TAG_variable\n");
 				/*push global variable into stack*/
-				BOOL result = NO;
+				bool result = false;
 				dvariable *source = new dvariable(dbg, die_cu_child, (vector<location *>)NULL);
 				Dwarf_Off off_type_cur = 0;
 				Dwarf_Die die_type_cur = 0;
 				result = get_die_type(dbg, die_cu_child, &die_type_cur, &off_type_cur);
-				if(result == YES && source->var_name!="" && source->loclist.size()>0){
+				if(result == true && source->var_name!="" && source->loclist.size()>0){
 					Dwarf_Half cur_type_tag = 0;
 					get_die_tag(die_type_cur, &cur_type_tag);
 					switch(cur_type_tag){
