@@ -33,6 +33,9 @@ extern "C"
 #include "dwarf.h"
 #include "libdwarf.h"
 
+/*include elf*/
+#include <gelf.h>
+
 #include <utility>
 
 #include "type_common.h"
@@ -44,6 +47,8 @@ extern "C"
 #include "infer.h"
 #include "ptr_handler.h"
 #include "debug_tool.h"
+
+#include "interproc.h"
 
 
 
@@ -1079,7 +1084,7 @@ main(int argc, char **argv)
 
     Dwarf_Debug dbg = 0;
     int fd = -1;
-    const char *filepath = "<stdin>";
+    char *filepath = "<stdin>";
     int res = DW_DLV_ERROR;
     Dwarf_Error error;
     Dwarf_Handler errhand = 0;
@@ -1097,8 +1102,13 @@ main(int argc, char **argv)
 
 
     filepath = argv[1];
-    fd = open(filepath,O_RDONLY);
 
+    //---------------------------------------------------------------------------------X
+    //ELF file header
+    map <int, call_map *> call_table;
+    get_call_table(filepath, call_table);
+
+    fd = open(filepath,O_RDONLY);
     if(fd < 0) {
         printf("Failure attempting to open \"%s\"\n",filepath);
     }
