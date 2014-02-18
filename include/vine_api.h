@@ -216,7 +216,7 @@ void draw_edges(FILE *fp, struct basic_block ** nodelist, int length);
 void draw_box(FILE *fp, struct basic_block ** nodelist, int index);
 void draw_graph(fblock_ptr func_block, int length);
 
-fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * prog, int func_num);
+fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * prog, int func_num, struct addr_range *text);
 
 BOOL check_tmp(Temp * tmp);
 fblock_ptr tranform_to_tmp_free(fblock_ptr func_blocks, int func_num);
@@ -231,6 +231,8 @@ int search_single_block_for_label(fblock_ptr vine_blocks, int block, string labl
 void remove_dom(fblock_ptr func_block, int target);
 
 BOOL trans_to_vineir(char *filename, vector<vine_block_t *> &vine_blocks, asm_program_t * &asmprog);
+
+unsigned long long name_to_hex(string name);
 #endif
 
 

@@ -42,13 +42,14 @@ extern "C"
 #include "location.h"
 #include "dvar.h"
 #include "tmp_s.h"
+#include "interproc.h"
 #include "vine_api.h"
 #include "vertex.h"
 #include "infer.h"
 #include "ptr_handler.h"
 #include "debug_tool.h"
 
-#include "interproc.h"
+
 
 
 
@@ -58,6 +59,8 @@ using namespace std;
 
 int func_list_len;
 int func_len;
+struct addr_range* text;
+map <int, call_map *> call_table;
 
 int s_s, s_u, u_s, u_u, s_un, u_un;
 
@@ -819,7 +822,40 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 				break;
 			}
 			case SPECIAL:{
-				//No Exp
+				Special *t_special = (Special *)vine_ir_block->block_list[j]->block[k];
+				if(t_special->special == "call"){
+					//Can be dynamic or static
+					//Currently ignore static. Will enable static in future, and uses addr range to distinguish
+
+					//For dynamic: map to a function string accroding to the jmp before this stmt
+					//Then read mem[esp+cons] = ... before this stmt
+					Jmp *call_addr = NULL;
+					if(k < 1){
+						if(vine_ir_block->block_list[j-1]->block[vine_ir_block->block_list[j-1]->blen-1]->stmt_type == JMP){
+							call_addr = (Jmp *)vine_ir_block->block_list[j-1]->block[vine_ir_block->block_list[j-1]->blen-1];
+						}
+					}else{
+						if(vine_ir_block->block_list[j]->block[k-1]->stmt_type == JMP){
+							call_addr = (Jmp *)vine_ir_block->block_list[j-1]->block[vine_ir_block->block_list[j-1]->blen-1];
+						}
+					}
+					if(call_addr != NULL){
+						if(call_addr->target->exp_type == NAME){
+							string target_name = ((Name *) call_addr->target)->name;
+							if(target_name.substr(0,5) == "pc_0x"){
+								Elf64_Addr addr = name_to_hex(target_name);
+								map <int, call_map *>::iterator it;
+								for(it = call_table.begin(); it != call_table.end(); it ++){
+									if(it->second->addr == addr){
+										string str = it->second->func_name;
+										cout<<"######call "<<str<<endl;
+									}
+								}
+							}
+						}
+					}
+
+				}
 				break;
 			}
 			case MOVE:{
@@ -867,6 +903,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 				break;
 			}
 			case CALL:{
+				//Doesn't exist?
 				read_exp(func_list, j, k, ((Call *)vine_ir_block->block_list[j]->block[k])->callee, g);
 				read_exp(func_list, j, k, ((Call *)vine_ir_block->block_list[j]->block[k])->lval_opt, g);
 				int w;
@@ -898,7 +935,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, bool ssaf, bool rmvf){
 	int i, j, k;
 	fblock_ptr tmp;
-	tmp = transform_to_ssa(vine_blocks, prog, func_num);
+	tmp = transform_to_ssa(vine_blocks, prog, func_num, text);
 	if(tmp->len == 0){
 		//cout<<"Empty function block"<<endl;
 		return;
@@ -1105,8 +1142,12 @@ main(int argc, char **argv)
 
     //---------------------------------------------------------------------------------X
     //ELF file header
-    map <int, call_map *> call_table;
-    get_call_table(filepath, call_table);
+    text = new struct addr_range();
+    get_call_table(filepath, call_table, text);
+	map <int, call_map *>::iterator it;
+	for(it = call_table.begin(); it != call_table.end(); it ++){
+		cout<<"#"<<it->first<<":"<<hex<<it->second->addr<<" "<<it->second->func_name<<endl;
+	}
 
     fd = open(filepath,O_RDONLY);
     if(fd < 0) {

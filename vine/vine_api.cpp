@@ -14,13 +14,20 @@ extern "C"
 
 #include "irtoir.h"
 
+/*include elf*/
+#include <gelf.h>
+
 #include "type_common.h"
 #include "tmp_s.h"
+#include "interproc.h"
 #include "vine_api.h"
+
+
 
 using namespace std;
 
 int cfg_funclist_length;
+struct addr_range* vine_text;
 
 //======================================================================
 //
@@ -326,7 +333,11 @@ BOOL trans_to_vineir(char *filename, vector<vine_block_t *> &vine_blocks, asm_pr
 	return res;
 }
 
-fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * prog, int func_num) {
+fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * prog, int func_num, struct addr_range *text) {
+
+	vine_text = new struct addr_range();
+	vine_text->high_addr= text->high_addr;
+	vine_text->low_addr= text->low_addr;
 
 	int i, j, k;
 	int cfg_funclist_length;
@@ -379,26 +390,26 @@ fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * 
 	add_comment(function_list);
 
 	//Add additional comments for those (C)Jmp stmts who cannot find traget inside of the same function
-	for (j = 0; j < function_list->len - 3; j++) {
-		for (k = 0; k < function_list->block_list[j]->blen; k++) {
-			switch (function_list->block_list[j]->block[k]->stmt_type) {
-			case JMP: {
-				add_comment_jmp_inside(function_list, j, k,
-						((Jmp *) function_list->block_list[j]->block[k])->target);
-				break;
-			}
-			case CJMP: {
-				add_comment_jmp_inside(function_list, j, k,
-						((CJmp *) function_list->block_list[j]->block[k])->f_target);
-				add_comment_jmp_inside(function_list, j, k,
-						((CJmp *) function_list->block_list[j]->block[k])->t_target);
-				break;
-			}
-			default:
-				break;
-			}
-		}
-	}
+//	for (j = 0; j < function_list->len - 3; j++) {
+//		for (k = 0; k < function_list->block_list[j]->blen; k++) {
+//			switch (function_list->block_list[j]->block[k]->stmt_type) {
+//			case JMP: {
+//				add_comment_jmp_inside(function_list, j, k,
+//						((Jmp *) function_list->block_list[j]->block[k])->target);
+//				break;
+//			}
+//			case CJMP: {
+//				add_comment_jmp_inside(function_list, j, k,
+//						((CJmp *) function_list->block_list[j]->block[k])->f_target);
+//				add_comment_jmp_inside(function_list, j, k,
+//						((CJmp *) function_list->block_list[j]->block[k])->t_target);
+//				break;
+//			}
+//			default:
+//				break;
+//			}
+//		}
+//	}
 
 
 	//	Construct control flow graph
@@ -426,6 +437,8 @@ fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * 
 		}
 	}
 
+	draw_graph(function_list, function_list->len);
+
 	return function_list;
 
 }
@@ -437,7 +450,10 @@ void add_edge_jmp(fblock_ptr func_block, Exp *target, int id) {
 		if (index >= 0) {
 			func_block->block_list[id]->child_next = index;
 		} else {
-			func_block->block_list[id]->child_next = block_count - 1;
+			/*dynamic functin call*/
+			/*point to next stmt*/
+			//func_block->block_list[id]->child_next = block_count - 1;
+			func_block->block_list[id]->child_next = id+1;
 		}
 	} else if (target->exp_type == TEMP) {
 		/*Point to BB_indrect*/
@@ -459,9 +475,10 @@ void add_edge_cjmp(fblock_ptr func_block, Exp *target, int id, TARGET opt) {
 
 		} else {
 			if (opt == C_F) {
-				func_block->block_list[id]->child_next = block_count - 1;
+				func_block->block_list[id]->child_next = id+1;
 			} else if (opt == C_T) {
-				func_block->block_list[id]->child_jmp = block_count - 1;
+				func_block->block_list[id]->child_jmp = id+1;
+						//block_count - 1;
 			}
 		}
 	} else if (target->exp_type == TEMP) {
@@ -889,7 +906,8 @@ void build_cfg(fblock_ptr func_block) {
 				case SPECIAL: {
 					func_block->block_list[i]->branch_type = UN;
 					flag = 1;
-					func_block->block_list[i]->child_next = func_block->len - 1;
+					//func_block->block_list[i]->child_next = func_block->len - 1;
+					func_block->block_list[i]->child_next = i + 1;
 					break;
 				}
 				default:
@@ -1098,18 +1116,45 @@ int predecessor_num_lookup(fblock_ptr func_block, int index) {
 	return count;
 }
 
-//int predecessors(vector<ssab_ptr> ssa_list, int a, int b){
-//	/*check whether ssa_list.at(a) is an predecessors of ssa_list.at(b)*/
-//	/*== whether b is reachable from a*/
-//	int result = 0;
-//	int i = a;
-//	while(i < ssa_list.size()){
-//
-//	}
-//	return result;
-//}
-
 void add_comment(fblock_ptr vine_blocks) {
+	int i, j;
+
+	for(i = 0; i < vine_blocks->len; i++){
+		for(j = 0; j < vine_blocks->block_list[i]->blen; j++){
+			switch (vine_blocks->block_list[i]->block[j]->stmt_type) {
+			case JMP: {
+				//cerr << "add_comment_jmp" << endl;
+				add_comment_jmp(vine_blocks, i, j,
+						((Jmp *) vine_blocks->block_list[i]->block[j])->target);
+				break;
+			}
+			case CJMP: {
+				//cerr << "add_comment_jmp" << endl;
+				add_comment_jmp(vine_blocks, i, j,
+						((CJmp *) vine_blocks->block_list[i]->block[j])->t_target);
+				add_comment_jmp(vine_blocks, i, j,
+						((CJmp *) vine_blocks->block_list[i]->block[j])->f_target);
+				break;
+			}
+			case SPECIAL: {
+				//cerr << "add_comment_special" << endl;
+				//comment_stmt(vine_blocks, i, j);
+				Special *t_special = (Special *) vine_blocks->block_list[i]->block[j];
+				if(t_special->special == "call"){
+					/*don't all comment to call*/
+				}else{
+					comment_stmt(vine_blocks, i, j);
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+	}
+}
+
+/*void add_comment(fblock_ptr vine_blocks) {
 	int i, j;
 	for(i = 0; i < vine_blocks->len; i++){
 		for(j = 0; j < vine_blocks->block_list[i]->blen; j++){
@@ -1138,7 +1183,7 @@ void add_comment(fblock_ptr vine_blocks) {
 			}
 		}
 	}
-}
+}*/
 
 int search_single_block_for_lable(fblock_ptr vine_blocks, int block, string lable) {
 	int i;
@@ -1188,6 +1233,7 @@ void add_comment_jmp_inside(fblock_ptr func_block, int j, int k, Exp *target) {
 	if (target->exp_type == NAME) {
 		int index = search_lable(func_block, ((Name *) target)->name);
 		if (index >= 0) {
+			/*jmp to somewhere inside of this*/
 			/*No need to comment*/
 		} else {
 			/*Error Jmp that jump to nowhere (indirect jump)*/
@@ -1196,14 +1242,52 @@ void add_comment_jmp_inside(fblock_ptr func_block, int j, int k, Exp *target) {
 	}
 }
 
-void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
+/*void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
 	if (target->exp_type == NAME) {
 		int index = search_raw_blocks(vine_blocks, ((Name *) target)->name, i);
 		if (index >= 0) {
-			/*No need to comment*/
+			No need to comment
 		} else {
-			/*Error Jmp that jump to nowhere (indirect jump)*/
+			Error Jmp that jump to nowhere (indirect jump)
 			comment_stmt(vine_blocks, i, j);
+		}
+	} else if (target->exp_type == TEMP) {
+		Indirect jmp
+		Add comment
+		comment_stmt(vine_blocks, i, j);
+	}
+}*/
+
+void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
+	address_t start_addr = vine_blocks->func->start_addr;
+	address_t end_addr = vine_blocks->func->end_addr;
+
+	if (target->exp_type == NAME) {
+		string target_name = ((Name *) target)->name;
+		if(target_name.substr(0,2) == "L_"){
+			int index = search_raw_blocks(vine_blocks, ((Name *) target)->name, i);
+			if (index >= 0) {
+				//No need to comment
+			} else {
+				//Error Jmp that jump to nowhere (indirect jump)
+				comment_stmt(vine_blocks, i, j);
+			}
+
+		}else if(target_name.substr(0,5) == "pc_0x"){
+			address_t addr = name_to_hex(target_name);
+			if(addr >= vine_text->low_addr && addr < vine_text->high_addr){
+				if(addr >= start_addr && addr < end_addr){
+					/*control flow inside of the same function*/
+					/*no need to comment*/
+				}else{
+					/*static function call*/
+					/*trans to comment temperately*/
+					comment_stmt(vine_blocks, i, j);
+				}
+			}else{
+				/*dynamic function call*/
+				/*no need to comment*/
+			}
 		}
 	} else if (target->exp_type == TEMP) {
 		/*Indirect jmp*/
@@ -1347,7 +1431,7 @@ void add_phi(fblock_ptr func_block) {
 		//printf("idom[BB_%d] = %d\n",i, doms[i].idom_id);
 	}
 
-	draw_graph(func_block, func_block->len);
+	//draw_graph(func_block, func_block->len);
 	/*Remove additional blocks that unreachable from start node*/
 	for (i = 1; i < func_block->len; i++) {
 		if (doms[i].idom_id == -1) {
@@ -1356,11 +1440,6 @@ void add_phi(fblock_ptr func_block) {
 			i--;
 		}
 	}
-//	for(i = 0; i <func_block->len - 2; i++){
-//		printf("idom[BB_%d] = %d\n",i, doms[i].idom_id);
-//	}
-
-	//draw_graph(func_block, func_block->len);
 
 	//Compute dominance frontier
 	vector<int> df[func_block->len];
@@ -1441,6 +1520,8 @@ void add_phi(fblock_ptr func_block) {
 			}
 		}
 	}
+
+	//draw_graph(func_block, func_block->len);
 }
 
 BOOL check_duplicated_phi(fblock_ptr func_block, int block, string name) {
@@ -1772,8 +1853,11 @@ int search_latest_assign(fblock_ptr func_block, int target, int reg_num,
 			result = get_latest_from_bblock(func_block, next, reg_num);
 		}
 		if (next == 0) {
-			result = current_number[get_reg_position(
-					((Tmp_s *) ((Move *) func)->lhs)->name)];
+			//Unable to find from current position to start point
+			//FIXME: why current number?
+			//change to: position of the first SSA variable of this register
+			//result = current_number[get_reg_position(((Tmp_s *) ((Move *) func)->lhs)->name)];
+			result = get_reg_position(((Tmp_s *) ((Move *) func)->lhs)->name);
 		}
 		//printf("result = %d\n",result);
 		//Check whether this parameter has been inserted
@@ -1788,6 +1872,17 @@ int search_latest_assign(fblock_ptr func_block, int target, int reg_num,
 				next_predecessor + 1, target);
 	}
 	return result;
+}
+
+unsigned long long name_to_hex(string name){
+	//string name: pc_0x80483fe -> hex number: 80483fe
+	unsigned long long res = 0;
+	std::stringstream str;
+	string t_str = name.substr(5);
+	str << t_str;
+	str >> std::hex >> res;
+	return res;
+
 }
 
 int get_latest_from_bblock(fblock_ptr func_block, int block, int reg_num) {
