@@ -1,0 +1,23 @@
+***********************function <__libc_csu_fini>7 start***********************
+BB_0{
+}
+BB_1{
+	80484e0	label pc_0x80484e0:
+	80484e0	var T_32t0:reg32_t;
+	80484e0	var T_32t1:reg32_t;
+	80484e0	var T_32t2:reg32_t;
+	80484e0	T_32t0:reg32_t = R_ESP_4:reg32_t;
+	80484e0	T_32t1:reg32_t = mem[R_ESP_4:reg32_t];
+	80484e0	T_32t2:reg32_t = (R_ESP_4:reg32_t+4:reg32_t);
+	80484e0	R_ESP_36:reg32_t = (R_ESP_4:reg32_t+4:reg32_t);
+	80484e0	//jmp(T_32t1:reg32_t);
+}
+BB_2{
+	80484e0	//special("ret");
+}
+BB_3{
+	80484e0	label L_24:
+}
+BB_4{
+}
+***********************function <__libc_csu_fini>7 end***********************

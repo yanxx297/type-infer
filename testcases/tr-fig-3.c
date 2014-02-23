@@ -1,7 +1,7 @@
 unsigned f(int arg1, int arg2, int arg3) {
-    int s1 = arg1 / 2;
-    int s2 = arg2 / 2;
-    int s3 = arg3 / 2;
+    int s1 = arg2 / arg3;
+    int s2 = arg1 / arg3;
+    int s3 = arg1 / arg2;
 
     int a1 = s1;
     int a2 = s2;
@@ -13,8 +13,8 @@ unsigned f(int arg1, int arg2, int arg3) {
     unsigned u1 = (unsigned)b1;
     unsigned u2 = (unsigned)b2;
     
-    u1 /= 2;
-    u2 /= 2;
+    u1 /= u2;
+    u2 /= u1;
     return u1 + u2;
 }
 

@@ -1,0 +1,70 @@
+***********************function <__i686.get_pc_thunk.bx>8 start***********************
+BB_0{
+}
+BB_1{
+	80484e2	label pc_0x80484e2:
+	80484e2	var T_32t0:reg32_t;
+	80484e2	var T_32t1:reg32_t;
+	80484e2	T_32t0:reg32_t = R_ESP_4:reg32_t;
+	80484e2	T_32t1:reg32_t = mem[R_ESP_4:reg32_t];
+	80484e2	R_EBX_36:reg32_t = mem[R_ESP_4:reg32_t];
+	80484e2	jmp(name(pc_0x80484e5));
+}
+BB_2{
+	80484e5	label pc_0x80484e5:
+	80484e5	var T_32t0:reg32_t;
+	80484e5	var T_32t1:reg32_t;
+	80484e5	var T_32t2:reg32_t;
+	80484e5	T_32t0:reg32_t = R_ESP_4:reg32_t;
+	80484e5	T_32t1:reg32_t = mem[R_ESP_4:reg32_t];
+	80484e5	T_32t2:reg32_t = (R_ESP_4:reg32_t+4:reg32_t);
+	80484e5	R_ESP_37:reg32_t = (R_ESP_4:reg32_t+4:reg32_t);
+	80484e5	//jmp(T_32t1:reg32_t);
+}
+BB_3{
+	80484e5	//special("ret");
+}
+BB_4{
+	80484e5	label L_25:
+	80484e6	label pc_0x80484e6:
+	80484e6	jmp(name(pc_0x80484e7));
+}
+BB_5{
+	80484e7	label pc_0x80484e7:
+	80484e7	jmp(name(pc_0x80484e8));
+}
+BB_6{
+	80484e8	label pc_0x80484e8:
+	80484e8	jmp(name(pc_0x80484e9));
+}
+BB_7{
+	80484e9	label pc_0x80484e9:
+	80484e9	jmp(name(pc_0x80484ea));
+}
+BB_8{
+	80484ea	label pc_0x80484ea:
+	80484ea	jmp(name(pc_0x80484eb));
+}
+BB_9{
+	80484eb	label pc_0x80484eb:
+	80484eb	jmp(name(pc_0x80484ec));
+}
+BB_10{
+	80484ec	label pc_0x80484ec:
+	80484ec	jmp(name(pc_0x80484ed));
+}
+BB_11{
+	80484ed	label pc_0x80484ed:
+	80484ed	jmp(name(pc_0x80484ee));
+}
+BB_12{
+	80484ee	label pc_0x80484ee:
+	80484ee	//jmp(name(pc_0x80484ef));
+}
+BB_13{
+	80484ef	label pc_0x80484ef:
+	80484ef	//jmp(name(pc_0x80484f0));
+}
+BB_14{
+}
+***********************function <__i686.get_pc_thunk.bx>8 end***********************

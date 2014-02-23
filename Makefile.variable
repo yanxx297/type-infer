@@ -3,7 +3,7 @@ CC=g++
 DWARF=/home/yanxx297/binary_analysis/dwarf-20130207/libdwarf
 VINE=/home/yanxx297/binary_analysis/vine-1.0/libasmir
 VEX=/home/yanxx297/binary_analysis/vine-1.0/VEX
-BINUTILS=/usr # Distribution-installed binutils-dev
+BINUTILS=/usr# Distribution-installed binutils-dev
 HOME=/home/yanxx297/project/src
 
 # Stephen's locations:
