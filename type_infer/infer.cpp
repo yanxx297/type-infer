@@ -5,6 +5,7 @@
 #include <set>
 #include <utility>
 #include <stdbool.h>
+#include <fcntl.h>
 
 /*include libdwarf*/
 #include "dwarf.h"
@@ -38,9 +39,11 @@ extern "C"
 #include "tmp_s.h"
 #include "dvar.h"
 #include "vine_api.h"
-//#include "debug_info.h"
+#include "debug_info.h"
 #include "vertex.h"
 
+#include "type_dwarf_util.h"
+#include "ptr_handler.h"
 #include "infer.h"
 
 using namespace std;
@@ -1128,5 +1131,780 @@ void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::verte
 				//do nothing
 			}
 		}
+	}
+}
+
+//Set signed/unsigned of function params and return value according to function name
+//Use dbg info or harded coded assignment based on existed knowledge
+void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, string func_name, Graph &g){
+	int i;
+	int res = -1;
+	for(i = IFUNC_STRCAT; i <= IFUNC_WMEMCMP; i++){
+		if(func_name == indirect[i]){
+			res = i;
+			break;
+		}
+	}
+
+	if(res == -1){
+		//No need to hardcode types
+		//read dbg info and map types
+		int res = -1;
+		Dwarf_Die subprog;
+		Dwarf_Debug dbg = 0;
+	    Dwarf_Error error;
+	    Dwarf_Handler errhand = 0;
+	    Dwarf_Ptr errarg = 0;
+	    bool result = false;
+	    int fd = open(DBGLIB,O_RDONLY);
+	    if(fd < 0) {
+	        printf("Failure attempting to open \"%s\"\n",DBGLIB);
+	    }
+	    res = dwarf_init(fd,DW_DLC_READ,errhand,errarg, &dbg,&error);
+	    if(res != DW_DLV_OK) {
+	        printf("Giving up, cannot do DWARF processing\n");
+	        exit(1);
+	    }
+	    result = libcdbg_read_cu(dbg, func_name, &subprog);
+	    if(result == true){
+	    	//DIE Getchu!
+    		int current_stmt;
+    		int current_block;
+
+	    	//1 Check type of return value
+	    	//get result exp
+
+    		Mem *ret_var = 0;
+	    	result = get_next_stmt(vine_ir_block, block, stmt, &current_block, &current_stmt);
+	    	while(result != false){
+	    		//mem[] = eax, get mem[]
+	    		if(vine_ir_block->block_list[current_block]->block[current_stmt]->stmt_type == MOVE){
+	    			Move *move = ((Move *)vine_ir_block->block_list[current_block]->block[current_stmt]);
+	    			if(is_tmps(move->rhs) == true){
+	    				Tmp_s *reg = ((Tmp_s *)move->rhs);
+	    				if(reg->name == str_reg[R_EAX] && move->lhs->exp_type == MEM){
+	    					ret_var = ((Mem *)move->lhs);
+	    					break;
+	    				}
+	    			}
+	    		}
+	    		result = get_next_stmt(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt);
+	    	}
+
+	    	if(result == false){
+	    		/*It may happen that the ret value is not used in this program*/
+	    		/*e.g. fclose(fp)*/
+//	    		perror("cannot find return value");
+//	    		exit(-1);
+	    	}else{
+		    	/*set edge of ret value*/
+		    	set_edge(func_list, dbg, subprog, current_block, current_stmt, NULL, ret_var, g);
+	    	}
+
+    		//-------------------------------------------------------------------------------------------X
+    		//2 check type of each param
+    		Dwarf_Die param;
+    		int offset = 0;
+    		sign_type_t su_param;
+    		result = get_prev_stmt(vine_ir_block, block, stmt, &current_block, &current_stmt);
+
+    		res = dwarf_child(subprog, &param, &error);
+    		while(res == DW_DLV_OK){
+    			//check tag = DW_TAG_formal_parameter
+    			Dwarf_Half child_tag;
+    			if(get_die_tag(param, &child_tag) != true){
+    				//next child
+    			}else{
+    				if(child_tag != DW_TAG_formal_parameter){
+    					//next child
+    				}else{
+    					while(result == true){
+    						//get_prev_stmt() return false if reach the beginning of func
+    	    				//check whether param correspond to current stmt
+    	    				if(check_param(vine_ir_block->block_list[current_block]->block[current_stmt], offset) == true){
+    	    					Exp *current_exp = ((Move *)vine_ir_block->block_list[current_block]->block[current_stmt])->rhs;
+    	    					set_edge(func_list, dbg, param, current_block, current_stmt, &offset, current_exp, g);
+    	    					break;
+    	    				}else{
+    	    					//go next
+    	    				}
+
+    	    				result = get_prev_stmt(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt);
+    	    			}
+    				}
+    			}
+    			res = dwarf_siblingof(dbg, param, &param, &error);
+    		}
+	    }
+	}else{
+		//indirect function
+		//hardcode types of params and return value
+		switch(res){
+		case IFUNC_STRCAT:{
+			break;
+		}
+		case IFUNC_INDEX:{
+			break;
+		}
+		case IFUNC_STRCMP:{
+			break;
+		}
+		case IFUNC_STRCPY:{
+			break;
+		}
+		case IFUNC_STRCSPN:{
+			break;
+		}
+		case IFUNC_STRLEN:{
+			break;
+		}
+		case IFUNC_STRNLEN:{
+			break;
+		}
+		case IFUNC_STRNCAT:{
+			break;
+		}
+		case IFUNC_STRNCMP:{
+			break;
+		}
+		case IFUNC_STRNCPY:{
+			break;
+		}
+		case IFUNC_RINDEX:{
+			break;
+		}
+		case IFUNC_STRPBRK:{
+			break;
+		}
+		case IFUNC_STRSPN:{
+			break;
+		}
+		case IFUNC_MEMCHR:{
+			break;
+		}
+		case IFUNC_BCMP:{
+			break;
+		}
+		case IFUNC_MEMMOVE:{
+			break;
+		}
+		case IFUNC_MEMSET:{
+			break;
+		}
+		case IFUNC_MEMPCPY:{
+			break;
+		}
+		case IFUNC_BCOPY:{
+			break;
+		}
+		case IFUNC_BZERO:{
+			break;
+		}
+		case IFUNC_STPCPY:{
+			break;
+		}
+		case IFUNC_STPNCPY:{
+			break;
+		}
+		case IFUNC_STRCASECMP:{
+			break;
+		}
+		case IFUNC_STRNCASECMP:{
+			break;
+		}
+		case IFUNC_MEMCPY:{
+			break;
+		}
+		case IFUNC_RAWMEMCHR:{
+			break;
+		}
+		case IFUNC_MEMRCHR:{
+			break;
+		}
+		case IFUNC_STRSTR:{
+			break;
+		}
+		case IFUNC_STRCASESTR:{
+			break;
+		}
+		case IFUNC_WCSCHR:{
+			break;
+		}
+		case IFUNC_WCSCMP:{
+			break;
+		}
+		case IFUNC_WCSCPY:{
+			break;
+		}
+		case IFUNC_WCSLEN:{
+			break;
+		}
+		case IFUNC_WCSRCHR:{
+			break;
+		}
+		case IFUNC_WMEMCMP:{
+			break;
+		}
+		default:{
+			break;
+		}
+		}
+	}
+}
+
+//Set edges of a param/ret according to Die
+bool set_edge(func_vertex_ptr func_list,Dwarf_Debug dbg, Dwarf_Die param, int block, int stmt, int *new_offset, Exp *current_exp, Graph &g){
+	bool result;
+	sign_type_t su_param;
+	int length;
+	//set s/u
+	result = get_su(dbg, param, &su_param);
+	if(result == false){
+		check_call_pointer(dbg, param, func_list, block, stmt, current_exp, g);
+	}else{
+		Graph::vertex_descriptor vtd = -1;
+		vtd = read_exp(func_list, block, stmt, current_exp, g);
+		if(vtd != -1){
+			if(su_param == SIGNED_T){
+				cout<<current_exp->tostring()<<"is signed because of libc info"<<endl;
+				add_edge_with_cap(func_list->s_des, vtd, MAX_CAP, 0, g);
+			}else if(su_param == UNSIGNED_T){
+				cout<<current_exp->tostring()<<"is unsigned because of libc info"<<endl;
+				add_edge_with_cap(vtd, func_list->u_des, MAX_CAP, 0, g);
+			}else{
+				perror("UNKNOWN type parameter\n");
+			}
+		}else{
+			perror("NO corresponding vertice for this exp\n");
+			//FIXME: no corresponding vertice for this exp
+			//Left not handled
+		}
+	}
+
+	// update offset
+	result = get_length(dbg, param, &length);
+	if(result == false){
+		if(new_offset != 0){
+			char offstr[128];
+			sprintf(offstr, "%d", *new_offset);
+			string errmsg = "cannot get length of param at eps+"+std::string(offstr);
+			perror(errmsg.c_str());
+		}else{
+			perror("cannot get length of ret value");
+		}
+
+		return false;
+	}
+
+	//new_offset is NULL if the caller send a ret value
+	if(new_offset != 0){
+		*new_offset += length;
+	}
+
+	return true;
+}
+
+Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g){
+	int op_id;
+	Graph::vertex_descriptor vtd = -1;
+	switch(exp->exp_type){
+	case BINOP:{
+		//Don't add this operation to graph if both operands are constant
+		if(((BinOp *)exp)->lhs->exp_type == CONSTANT && ((BinOp *)exp)->rhs->exp_type == CONSTANT ){
+			break;
+		}
+
+		Graph::vertex_descriptor v_l;
+		//= boost::add_vertex(g);
+		Graph::vertex_descriptor v_r;
+		Graph::vertex_descriptor v_op = -1;
+		//= boost::add_vertex(g);
+		v_l = read_exp(func_block, block, stmt, ((BinOp *) exp)->lhs, g);
+		v_r = read_exp(func_block, block, stmt, ((BinOp *) exp)->rhs, g);
+
+		Bin_Operation *op_vertex = new Bin_Operation(((BinOp *)exp)->binop_type, v_l, v_r, v_op, (BinOp *)exp, block, stmt);
+
+
+
+		/*Check duplicate operation*/
+		op_id = check_duplicate_operation(func_block, op_vertex);
+		if(op_id == -1){
+			//No duplicate
+			boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
+			boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
+			boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
+
+			//v_op= boost::add_vertex(g);
+			v_op= add_default_vertex(g, UNSIGNED_T);
+			op_vertex->my_descriptor = v_op;
+
+			func_block->op_list.push_back(op_vertex);
+			g_id[v_op] = func_block->op_list.size() - 1;
+			g_vet[v_op] = OPERATION;
+
+			char number[256];
+			sprintf(number, "%d", v_op);
+			string number_str = std::string(number);
+			g_name[v_op] = number_str + ":" +binop_label[((BinOp *)exp)->binop_type];
+
+			//printf("\t%d -> %d\n",v_l, v_op);
+			//printf("\t%d -> %d\n",v_r, v_op);
+			if(v_l != -1){
+				add_edge_with_cap(v_l, v_op, 1, 0, g);
+			}
+			if(v_r != -1){
+				add_edge_with_cap(v_r, v_op, 1, 0, g);
+			}
+
+
+			vtd = v_op;
+		}else{
+			//Duplicate.
+			vtd = func_block->op_list.at(op_id)->my_descriptor;
+		}
+
+		//Handle smod there (% and /)
+
+
+		break;
+	}
+	case UNOP:{
+		//Don't add this operation to graph if the operand is an constant
+		if(((UnOp *)exp)->exp->exp_type == CONSTANT){
+			break;
+		}
+
+		Graph::vertex_descriptor v_target;
+		Graph::vertex_descriptor v_op = -1;
+		v_target = read_exp(func_block, block, stmt, ((UnOp *) exp)->exp, g);
+
+		Un_Operation *op_vertex = new Un_Operation(((UnOp *) exp)->unop_type, v_target, v_op, block, stmt);
+
+		op_id = check_duplicate_operation(func_block, op_vertex);
+		if(op_id == -1){
+			boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
+			boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
+			boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
+
+			//v_op = boost::add_vertex(g);
+			v_op = add_default_vertex(g, UNSIGNED_T);
+			op_vertex->my_descriptor = v_op;
+
+			func_block->op_list.push_back(op_vertex);
+			g_id[v_op] = func_block->op_list.size() - 1;
+			g_vet[v_op] = OPERATION;
+			g_name[v_op] = unop_label[((UnOp *)exp)->unop_type];
+
+			if(v_target != -1){
+				add_edge_with_cap(v_target, v_op, 1, 0, g);
+			}
+			vtd = v_op;
+		}else{
+			vtd = func_block->op_list.at(op_id)->my_descriptor;
+		}
+
+		break;
+	}
+	case CONSTANT:{
+		//No Exp
+		break;
+	}
+	case MEM:{
+		vtd = ptarget_lookup(func_block, ((Mem *)exp), block, stmt);
+
+		if(vtd == -1){
+			vtd = var_lookup(func_block, exp, block, stmt);
+		}
+
+		//If still can't find, then look for mem[] = reg and return the vtd of reg
+		if(vtd == -1){
+			vtd = copy_from_reg_lookup(func_block, block, stmt, ((Mem *)exp));
+		}
+
+#ifdef DEBUG
+		if(vtd != -1){
+			printf("in %s\n",exp->tostring().c_str());
+		}
+		printf("result: %d\n",vtd);
+#endif
+		break;
+	}
+	case TEMP:{
+		if(get_reg_position(((Temp *)exp)->name) != -1){
+			/*Register*/
+
+			/*Push register into vector & graph g, return index in vector*/
+			int index = push_register(func_block, (Tmp_s *)exp, g);
+			if(index != -1){
+				vtd = func_block->reg_list.at(index)->my_descriptor;
+			}
+
+			/*check whether it's an variable*/
+			/*If so, add edge between this res and corresponding var*/
+			if(vtd != -1){
+				int count;
+				for(count = 0; count < func_block->variable_list.size(); count ++){
+					dvariable *var = func_block->variable_list.at(count)->debug_info;
+					if(var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true){
+						//cout<<func_block->stmt_block->block_list[block]->block[stmt]->tostring()<<endl;
+						add_edge_with_cap(vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
+					}
+				}
+			}
+
+		}else{
+			/*temporary variables*/
+			/*Should be translate to expressions of registers and constants, recursively*/
+			/*SHOULD NOT EXIST since I have translate all temporary variables into register expression*/
+		}
+		break;
+	}
+	case PHI:{
+		//No Exp
+		break;
+	}
+	case CAST:{
+		//??????
+		//How to deal with cast?
+		vtd = read_exp(func_block, block, stmt, ((Cast *) exp)->exp, g);
+		break;
+	}
+	case NAME:{
+		//No Exp
+		break;
+	}
+	case UNKNOWN:{
+		//No Exp
+		break;
+	}
+	case LET:{
+		//??????????
+		//What's let?
+		read_exp(func_block, block, stmt, ((Let *) exp)->exp, g);
+		read_exp(func_block, block, stmt, ((Let *) exp)->var, g);
+		read_exp(func_block, block, stmt, ((Let *) exp)->in, g);
+		break;
+	}
+	case EXTENSION:{
+		//No definition?!
+		break;
+	}
+	default:
+		break;
+	}
+	return vtd;
+}
+
+//get the previous stmt on (SSA) stmt block
+bool get_prev_stmt(fblock_ptr vine_ir_block, int block, int stmt, int *b, int *s){
+	int current_stmt;
+	int current_block;
+	if(stmt == 0){
+		current_block = block - 1;
+		if(current_block < 0){
+			//reach the begining of function
+			return false;
+		}
+		current_stmt = vine_ir_block->block_list[current_block]->blen-1;
+
+		if(current_stmt < 0){
+			return false;
+		}
+	}else{
+		current_stmt = stmt -1;
+		current_block = block;
+	}
+
+	*b = current_block;
+	*s = current_stmt;
+
+	return true;
+}
+
+//get next stmt on (SSA) stmt block
+bool get_next_stmt(fblock_ptr vine_ir_block, int block, int stmt, int *b, int *s){
+	int current_stmt;
+	int current_block = block;
+	if(stmt == vine_ir_block->block_list[block]->blen-1){
+		do{
+			current_block += 1;
+			if(current_block > vine_ir_block->len - 1){
+				//reach the begining of function
+				return false;
+			}
+		}while(vine_ir_block->block_list[current_block]->blen <= 0);
+
+		current_stmt = 0;
+	}else{
+		current_stmt = stmt + 1;
+		current_block = block;
+	}
+
+	*b = current_block;
+	*s = current_stmt;
+
+	return true;
+}
+
+//check whether offset correspond to current stmt
+//Offset is the CURRENT offset before param is checked
+//mem[eps + offset] = ...
+bool check_param(Stmt *stmt, int offset){
+	if(stmt->stmt_type == MOVE){
+		Move *move = (Move *)stmt;
+		if(move->lhs->exp_type == MEM){
+			Exp *exp = ((Mem *)move->lhs)->addr;
+			if(exp->exp_type == BINOP){
+				BinOp * bop = (BinOp *)exp;
+				if(bop->binop_type != PLUS){
+					return false;
+				}
+
+				Temp *temp;
+				int cons;
+				if(bop->lhs->exp_type == TEMP && bop->rhs->exp_type == CONSTANT){
+					temp = (Temp *)bop->lhs;
+					cons = handle_constant(((Constant *)bop->rhs)->val);
+				}else if(bop->rhs->exp_type == TEMP && bop->lhs->exp_type == CONSTANT){
+					temp = (Temp *)bop->rhs;
+					cons = handle_constant(((Constant *)bop->lhs)->val);
+				}else{
+					return false;
+				}
+
+				if(offset == cons){
+					return true;
+				}
+			}else if(exp->exp_type == TEMP){
+				Temp *temp = (Temp *)exp;
+				if(temp->name == str_reg[R_ESP] && offset == 0){
+					return true;
+				}else{
+					return false;
+				}
+			}else{
+				return false;
+			}
+		}else{
+			return false;
+		}
+	}else{
+		return false;
+	}
+
+	return false;
+}
+
+/*map type from given DIE to variables in ptarget_list*/
+/*exp is the Mem[] containing a pointer*/
+bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, func_vertex_ptr func_list, int block, int stmt, Exp *exp, Graph &g){
+	bool result;
+	int i;
+	Dwarf_Die die_type;
+	Dwarf_Off off_type = 0;
+	result = get_die_type(dbg, die, &die_type, &off_type);
+	if(result == false){
+		return false;
+	}
+
+	Dwarf_Half tag;
+	result = get_die_tag(die_type, &tag);
+	if(result == false){
+		return false;
+	}
+
+	/*get dvar*/
+	vector <location *> null_fb;
+	dvariable *source = new dvariable(dbg, die, null_fb);
+	dptr * var_l = new dptr(dbg, *source, die_type, off_type, 0, (dvariable *)0);
+
+	switch(tag){
+	case DW_TAG_pointer_type:{
+		dvariable *var_l_base;
+		if(is_single_ptr(var_l, var_l_base) == true){
+			Graph::vertex_descriptor vtd = -1;
+			vtd = read_exp(func_list, block, stmt, exp, g);
+			if(vtd == -1){
+				/*Single in function info v.s. multiple fields in accessed variable*/
+				return false;
+			}
+
+			sign_type_t sut = ((dbase *)var_l_base)->original_su;
+			if(sut == SIGNED_T){
+				add_edge_with_cap(func_list->s_des, vtd, MAX_CAP, 0, g);
+			}else if(sut == UNSIGNED_T){
+				add_edge_with_cap(vtd, func_list->u_des, MAX_CAP, 0, g);
+			}
+
+			return true;
+		}else{
+			/*struct*/
+			/*set type according to name and size*/
+			vector<Pointed *> ptarget_list, pstack;
+			push_lib_var(var_l, ptarget_list);
+			int i, j;
+
+			//get pointer
+			dptr *ptr_dbg = 0;
+			Tmp_s * tmps = 0;
+			if(is_tmps(exp) == true){
+				tmps = (Tmp_s *)exp;
+			}
+
+			for(i = 0; i < func_list->ptr_list.getsize(); i++){
+				/*check ptr original location*/
+				if(func_list->ptr_list.plist.at(i)->debug_info->cmp_loc(exp, func_list->stmt_block->block_list[block]->block[stmt]->asm_address) == true){
+					/*plist.at(i) is the corresponding pointer*/
+					ptr_dbg = func_list->ptr_list.plist.at(i)->debug_info;
+					break;
+				}
+
+				/*check copy list*/
+				if(tmps != 0){
+					int j;
+					for(j = 0; j < func_list->ptr_list.plist.at(i)->copy_list.size(); j++){
+						result = func_list->ptr_list.plist.at(i)->copy_list.at(j)->cmp_tmp(tmps);
+						if(result == true){
+							ptr_dbg = func_list->ptr_list.plist.at(i)->debug_info;
+							break;
+						}
+					}
+				}
+
+				if(ptr_dbg != 0){
+					break;
+				}
+				}
+
+			if(ptr_dbg == 0){
+				return false;
+			}
+
+			/*put all children of ptr_dbg into pstack*/
+			for(i = 0; i < func_list->ptarget_list.size(); i++){
+				for(j = 0; j < func_list->ptarget_list.at(i)->debug_info_list.size(); j++){
+					if(check_child(ptr_dbg, func_list->ptarget_list.at(i)->debug_info_list.at(j)) == true){
+						pstack.push_back(func_list->ptarget_list.at(i));
+						break;
+					}
+				}
+			}
+
+			/*mapping from lib info to ptargets in pstack*/
+			for(i = 0; i < ptarget_list.size(); i++){
+				for(j = 0; j < pstack.size(); j++){
+					if(pstack.at(j)->cmp_pointed(ptarget_list.at(i)) == true){
+						//Set s/u type according to ptarget_list
+						sign_type_t sut = ptarget_list.at(i)->debug_info_list.at(0)->original_su;
+						if(sut == SIGNED_T){
+							add_edge_with_cap(func_list->s_des, pstack.at(j)->my_descriptor, MAX_CAP, 0, g);
+						}else if(sut == UNSIGNED_T){
+							add_edge_with_cap(pstack.at(j)->my_descriptor, func_list->u_des, MAX_CAP, 0, g);
+						}
+						break;
+					}
+				}
+			}
+			return true;
+		}
+
+		break;
+	}
+	default:{
+		break;
+	}
+	}
+
+	return false;
+}
+
+//whether given dptr* point to a single type (or a struct)
+bool is_single_ptr(dptr *ptr, dvariable *&ret){
+	dvariable * var = ptr->var;
+	while(var != 0){
+		switch(var->var_struct_type){
+		case DVAR_BASE:{
+			ret = var;
+			return true;
+		}
+		case DVAR_ARRAY:{
+			var = ((darray *)var)->var;
+			break;
+		}
+		case DVAR_STRUCT:{
+			ret = var;
+			return false;
+		}
+		case DVAR_POINTER:{
+			var = ((dptr *)var)->var;
+			break;
+		}
+		case DVAR_UN:{
+			perror("DVAR_UN");
+			exit(-1);
+		}
+
+		default:{
+			break;
+		}
+		}
+	}
+
+	return false;
+}
+
+//Similar to push_each_pointer, but this one is for pushing ret/params of lib funcs to formal structure
+void push_lib_var(dvariable *var, vector<Pointed *> &ptarget_list){
+	if(var == 0){
+		return;
+	}
+	switch(var->var_struct_type){
+	case DVAR_BASE:{
+		dbase *base = (dbase *)var;
+		//Check whether its a new pointer type
+		int ptr_pos = check_ptr(var, ptarget_list);
+		if(ptr_pos == -1){
+			/*Add new pointer to ptr_list*/
+			string name = get_full_name(base);
+			Pointed *tmp = new Pointed(base, -1, name);
+			ptarget_list.push_back(tmp);
+		}else{
+			/*This type already exist*/
+			/*Add new debug_info only*/
+			ptarget_list.at(ptr_pos)->Add_into_list(base);
+		}
+
+		break;
+	}
+	case DVAR_STRUCT:{
+		dstruct * stru = (dstruct *)var;
+		int i;
+		if(stru->leaf == false){
+			for(i = 0; i < stru->member_list.size(); i++){
+				//cout<<"member_list size = "<<stru->member_list.size() << endl;
+				if(stru->member_list.at(i) != 0){
+					push_lib_var(stru->member_list.at(i), ptarget_list);
+				}
+			}
+		}
+		break;
+	}
+	case DVAR_ARRAY:{
+		darray * arr = (darray *)var;
+		if(arr->var != 0 && arr->leaf != true){
+			push_lib_var(arr->var, ptarget_list);
+		}
+		break;
+	}
+	case DVAR_POINTER:{
+		dptr * ptr = (dptr *)var;
+		if(ptr->leaf == false){
+			push_lib_var(ptr->var, ptarget_list);
+		}
+		break;
+	}
+	default:{
+		break;
+	}
 	}
 }

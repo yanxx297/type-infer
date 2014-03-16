@@ -28,4 +28,7 @@ bool cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var);
 bool cmp_offset(int in_offset, dvariable *var);
 int handle_constant(unsigned long long offset);
 
+bool get_su(Dwarf_Debug dbg, Dwarf_Die die, sign_type_t *ret);
+bool get_length(Dwarf_Debug dbg, Dwarf_Die die, int *ret);
+
 #endif

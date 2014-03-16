@@ -166,7 +166,7 @@ BB_13{
 	80482b8	T_32t1:reg32_t = (R_ESP_79:reg32_t-4:reg32_t);
 	80482b8	R_ESP_80:reg32_t = (R_ESP_79:reg32_t-4:reg32_t);
 	80482b8	mem[(R_ESP_79:reg32_t-4:reg32_t)] = 134513341:reg32_t;
-	80482b8	//jmp(name(pc_0x80484f0));
+	80482b8	//jmp(name(pc_0x80485a0));
 }
 BB_14{
 	80482b8	special("call");

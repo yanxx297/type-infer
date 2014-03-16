@@ -104,6 +104,7 @@ public:
 	Pointed(dbase *debug_info, Graph::vertex_descriptor descriptor, string name);
 	void Add_into_list(dbase *debug_info);
 	bool cmp_ptr_type(dvariable * ptr);
+	bool cmp_pointed(Pointed *ptr);
 
 	vector <dbase *> debug_info_list;
 	string ptr_name;

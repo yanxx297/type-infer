@@ -24,7 +24,7 @@ public:
 	int s_offset; // 0 by default, offset if in structure
 	DVAR_TYPE_T var_struct_type;//DVAR_UN by default
 	dvariable *parent;// 0(NULL) by default
-	bool leaf;//whether this is a lead node in debugging info tree
+	bool leaf;//whether this is a leaf node in debugging info tree
 };
 
 class dbase: public dvariable{

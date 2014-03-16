@@ -115,7 +115,7 @@ BB_8{
 	804830b	T_32t3:reg32_t = R_ESP_67:reg32_t;
 	804830b	T_32t2:reg32_t = (R_ESP_67:reg32_t-4:reg32_t);
 	804830b	R_ESP_68:reg32_t = (R_ESP_67:reg32_t-4:reg32_t);
-	804830b	mem[(R_ESP_67:reg32_t-4:reg32_t)] = 134513888:reg32_t;
+	804830b	mem[(R_ESP_67:reg32_t-4:reg32_t)] = 134514064:reg32_t;
 	804830b	jmp(name(pc_0x8048310));
 }
 BB_9{
@@ -127,7 +127,7 @@ BB_9{
 	8048310	T_32t3:reg32_t = R_ESP_68:reg32_t;
 	8048310	T_32t2:reg32_t = (R_ESP_68:reg32_t-4:reg32_t);
 	8048310	R_ESP_69:reg32_t = (R_ESP_68:reg32_t-4:reg32_t);
-	8048310	mem[(R_ESP_68:reg32_t-4:reg32_t)] = 134513776:reg32_t;
+	8048310	mem[(R_ESP_68:reg32_t-4:reg32_t)] = 134513952:reg32_t;
 	8048310	jmp(name(pc_0x8048315));
 }
 BB_10{
@@ -165,7 +165,7 @@ BB_12{
 	8048317	T_32t3:reg32_t = R_ESP_71:reg32_t;
 	8048317	T_32t2:reg32_t = (R_ESP_71:reg32_t-4:reg32_t);
 	8048317	R_ESP_72:reg32_t = (R_ESP_71:reg32_t-4:reg32_t);
-	8048317	mem[(R_ESP_71:reg32_t-4:reg32_t)] = 134513732:reg32_t;
+	8048317	mem[(R_ESP_71:reg32_t-4:reg32_t)] = 134513876:reg32_t;
 	8048317	jmp(name(pc_0x804831c));
 }
 BB_13{

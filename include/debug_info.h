@@ -44,8 +44,7 @@ struct subprog{
 	vector<var_info *> variable;
 };
 
-vector<subprog> debug_info;
-struct subprog global;
+
 
 static void read_cu_list(Dwarf_Debug dbg);
 static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level);
@@ -70,5 +69,9 @@ int set_offset(Dwarf_Die var);
 string set_name(Dwarf_Die die);
 void get_struct_ptr(Dwarf_Debug dbg, Dwarf_Die var, Dwarf_Off type_offset, Dwarf_Die stru, Dwarf_Die member, struct var_info *&ret);
 
+
+bool libcdbg_read_cu(Dwarf_Debug dbg, string funcname, Dwarf_Die *ret);
+bool get_libcfunc_die(Dwarf_Debug dbg, string funcname, Dwarf_Die in_die, Dwarf_Die *ret, int in_level);
+bool check_funcname(Dwarf_Debug dbg, string funcname, Dwarf_Die die, Dwarf_Die *ret, int level);
 
 #endif /* DEBUG_INFO_H_ */

@@ -1,0 +1,9 @@
+a1 f tr3_2
+a2 f tr3_2
+a3 f tr3_2
+a1 f tr3_2
+a2 f tr3_2
+a3 f tr3_2
+a1 f tr3_2
+a2 f tr3_2
+a3 f tr3_2

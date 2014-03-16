@@ -438,7 +438,7 @@ void draw_var_graph(func_vertex_ptr func_block, Graph& g){
 	fclose(fp);
 }
 
-/*Push each pointer into ptarget list*/
+/*Push var into ptarget list*/
 void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 	if(var == 0){
 		return;
@@ -450,7 +450,7 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 		boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
 		dbase *base = (dbase *)var;
 		//Check whether its a new pointer type
-		int ptr_pos = check_ptr(var, func_list);
+		int ptr_pos = check_ptr(var, func_list->ptarget_list);
 		if(ptr_pos == -1){
 			/*Add new pointer to ptr_list*/
 			Graph::vertex_descriptor v_ptr;
@@ -487,7 +487,6 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 	}
 	case DVAR_ARRAY:{
 		darray * arr = (darray *)var;
-		int i;
 		if(arr->var != 0 && arr->leaf != true){
 			push_each_pointer(arr->var, func_list, g);
 		}
@@ -598,206 +597,6 @@ void push_variable(subprogram *prog, func_vertex_ptr func_list, Graph& g){
 
 }
 
-
-
-Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g){
-	int op_id;
-	Graph::vertex_descriptor vtd = -1;
-	switch(exp->exp_type){
-	case BINOP:{
-		//Don't add this operation to graph if both operands are constant
-		if(((BinOp *)exp)->lhs->exp_type == CONSTANT && ((BinOp *)exp)->rhs->exp_type == CONSTANT ){
-			break;
-		}
-
-		Graph::vertex_descriptor v_l;
-		//= boost::add_vertex(g);
-		Graph::vertex_descriptor v_r;
-		Graph::vertex_descriptor v_op = -1;
-		//= boost::add_vertex(g);
-		v_l = read_exp(func_block, block, stmt, ((BinOp *) exp)->lhs, g);
-		v_r = read_exp(func_block, block, stmt, ((BinOp *) exp)->rhs, g);
-
-		Bin_Operation *op_vertex = new Bin_Operation(((BinOp *)exp)->binop_type, v_l, v_r, v_op, (BinOp *)exp, block, stmt);
-
-
-
-		/*Check duplicate operation*/
-		op_id = check_duplicate_operation(func_block, op_vertex);
-		if(op_id == -1){
-			//No duplicate
-			boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
-			boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
-			boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
-
-			//v_op= boost::add_vertex(g);
-			v_op= add_default_vertex(g, UNSIGNED_T);
-			op_vertex->my_descriptor = v_op;
-
-			func_block->op_list.push_back(op_vertex);
-			g_id[v_op] = func_block->op_list.size() - 1;
-			g_vet[v_op] = OPERATION;
-
-			char number[256];
-			sprintf(number, "%d", v_op);
-			string number_str = std::string(number);
-			g_name[v_op] = number_str + ":" +binop_label[((BinOp *)exp)->binop_type];
-
-			//printf("\t%d -> %d\n",v_l, v_op);
-			//printf("\t%d -> %d\n",v_r, v_op);
-			if(v_l != -1){
-				add_edge_with_cap(v_l, v_op, 1, 0, g);
-			}
-			if(v_r != -1){
-				add_edge_with_cap(v_r, v_op, 1, 0, g);
-			}
-
-
-			vtd = v_op;
-		}else{
-			//Duplicate.
-			vtd = func_block->op_list.at(op_id)->my_descriptor;
-		}
-
-		//Handle smod there (% and /)
-
-
-		break;
-	}
-	case UNOP:{
-		//Don't add this operation to graph if the operand is an constant
-		if(((UnOp *)exp)->exp->exp_type == CONSTANT){
-			break;
-		}
-
-		Graph::vertex_descriptor v_target;
-		Graph::vertex_descriptor v_op = -1;
-		v_target = read_exp(func_block, block, stmt, ((UnOp *) exp)->exp, g);
-
-		Un_Operation *op_vertex = new Un_Operation(((UnOp *) exp)->unop_type, v_target, v_op, block, stmt);
-
-		op_id = check_duplicate_operation(func_block, op_vertex);
-		if(op_id == -1){
-			boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
-			boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
-			boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
-
-			//v_op = boost::add_vertex(g);
-			v_op = add_default_vertex(g, UNSIGNED_T);
-			op_vertex->my_descriptor = v_op;
-
-			func_block->op_list.push_back(op_vertex);
-			g_id[v_op] = func_block->op_list.size() - 1;
-			g_vet[v_op] = OPERATION;
-			g_name[v_op] = unop_label[((UnOp *)exp)->unop_type];
-
-			if(v_target != -1){
-				add_edge_with_cap(v_target, v_op, 1, 0, g);
-			}
-			vtd = v_op;
-		}else{
-			vtd = func_block->op_list.at(op_id)->my_descriptor;
-		}
-
-		break;
-	}
-	case CONSTANT:{
-		//No Exp
-		break;
-	}
-	case MEM:{
-		vtd = ptarget_lookup(func_block, ((Mem *)exp), block, stmt);
-
-		if(vtd == -1){
-			vtd = var_lookup(func_block, exp, block, stmt);
-		}
-
-		//If still can't find, then look for mem[] = reg and return the vtd of reg
-		if(vtd == -1){
-			vtd = copy_from_reg_lookup(func_block, block, stmt, ((Mem *)exp));
-		}
-
-#ifdef DEBUG
-		if(vtd != -1){
-			printf("in %s\n",exp->tostring().c_str());
-		}
-		printf("result: %d\n",vtd);
-#endif
-		break;
-	}
-	case TEMP:{
-		if(get_reg_position(((Temp *)exp)->name) != -1){
-			/*Register*/
-
-			/*Push register into vector & graph g, return index in vector*/
-			int index = push_register(func_block, (Tmp_s *)exp, g);
-			if(index != -1){
-				vtd = func_block->reg_list.at(index)->my_descriptor;
-			}
-
-			/*check whether it's an variable*/
-			/*If so, add edge between this res and corresponding var*/
-			if(vtd != -1){
-				int count;
-				for(count = 0; count < func_block->variable_list.size(); count ++){
-					dvariable *var = func_block->variable_list.at(count)->debug_info;
-					if(var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true){
-						//cout<<func_block->stmt_block->block_list[block]->block[stmt]->tostring()<<endl;
-						add_edge_with_cap(vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
-					}
-				}
-			}
-
-		}else{
-			/*temporary variables*/
-			/*Should be translate to expressions of registers and constants, recursively*/
-			/*SHOULD NOT EXIST since I have translate all temporary variables into register expression*/
-		}
-		break;
-	}
-	case PHI:{
-		//No Exp
-		break;
-	}
-	case CAST:{
-		//??????
-		//How to deal with cast?
-		vtd = read_exp(func_block, block, stmt, ((Cast *) exp)->exp, g);
-		break;
-	}
-	case NAME:{
-		//No Exp
-		break;
-	}
-	case UNKNOWN:{
-		//No Exp
-		break;
-	}
-	case LET:{
-		//??????????
-		//What's let?
-		read_exp(func_block, block, stmt, ((Let *) exp)->exp, g);
-		read_exp(func_block, block, stmt, ((Let *) exp)->var, g);
-		read_exp(func_block, block, stmt, ((Let *) exp)->in, g);
-		break;
-	}
-	case EXTENSION:{
-		//No definition?!
-		break;
-	}
-	default:
-		break;
-	}
-	return vtd;
-}
-
-
-
-
-
-
-
-
 //block and stmt are for func_list
 void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 	int i, j, k;
@@ -849,6 +648,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 									if(it->second->addr == addr){
 										string str = it->second->func_name;
 										cout<<"######call "<<str<<endl;
+										check_call(vine_ir_block, func_list, j, k, str, g);
 									}
 								}
 							}

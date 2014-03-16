@@ -36,6 +36,14 @@ Tmp_s::Tmp_s(reg_t typ, string name, int id) :
 	Temp(typ, name), index(id){
 }
 
+bool Tmp_s::cmp_tmp(Tmp_s *tmp){
+	if(tmp->name == this->name && tmp->index == this->index){
+		return true;
+	}else{
+		return false;
+	}
+}
+
 string Tmp_s::tostring() const {
 	//printf("Call Tmp_s.tostring()\n");
 	char ssa_id[64];

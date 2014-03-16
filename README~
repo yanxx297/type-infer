@@ -13,6 +13,6 @@ You can set them in type-infer-src/Makefile.variable.
 
 Running:
 For standard libc support, the debug information file of libc must be copy into the same folder of the executable, with "libc-2.15.so" as its name.
-This file can be find in /usr/lib/debug/lib/i386-linux-gnu for Ubuntu Linux distribution.
+This file can be find in /usr/lib/debug/lib/i386-linux-gnu for Ubuntu.
 
 test branch

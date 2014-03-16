@@ -135,11 +135,11 @@ int check_plist(dptr *ptr, vector<pointer_info *> plist){
 //Check duplicated ptarget
 //Check whether the type of <ptr> already exist
 //Return position in vector if found
-int check_ptr(dvariable * ptr, func_vertex_ptr func_list){
+int check_ptr(dvariable * ptr, vector<Pointed *> &ptarget_list){
 	int res = -1;
 	int i;
-	for(i = 0; i < func_list->ptarget_list.size(); i++){
-		if(func_list->ptarget_list.at(i)->cmp_ptr_type(ptr) == true){
+	for(i = 0; i < ptarget_list.size(); i++){
+		if(ptarget_list.at(i)->cmp_ptr_type(ptr) == true){
 			res = i;
 			break;
 		}

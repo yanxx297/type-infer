@@ -41,6 +41,16 @@ bool compare_exp(Exp *former, Exp *latter);
 
 string get_full_name(dbase *var);
 
-void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::vertex_descriptor v_src, Graph &g);
+Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g);
 
+void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::vertex_descriptor v_src, Graph &g);
+void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, string func_name, Graph &g);
+bool get_prev_stmt(fblock_ptr vine_ir_block, int block, int stmt, int *b, int *s);
+bool check_param(Stmt *stmt, int offset);
+
+bool get_next_stmt(fblock_ptr vine_ir_block, int block, int stmt, int *b, int *s);
+bool set_edge(func_vertex_ptr func_list,Dwarf_Debug dbg, Dwarf_Die param, int block, int stmt, int *new_offset, Exp *current_exp, Graph &g);
+bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, func_vertex_ptr func_list, int block, int stmt, Exp *exp, Graph &g);
+bool is_single_ptr(dptr *ptr, dvariable *&ret);
+void push_lib_var(dvariable *var, vector<Pointed *> &ptarget_list);
 #endif /* INFER_H_ */

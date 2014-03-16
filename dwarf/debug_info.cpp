@@ -32,6 +32,8 @@ extern "C"
 
 
 static vector<var_info> var_list;
+vector<subprog> debug_info;
+struct subprog global;
 
 using namespace std;
 
@@ -1093,68 +1095,201 @@ static Dwarf_Die get_type(Dwarf_Debug dbg, Dwarf_Die curr_die, Dwarf_Off *type_o
 
 }
 
-static void print_debug_info(vector<subprog> dbg) {
-	unsigned int subprog_num, var_num;
-	Dwarf_Error error = 0;
-	int i, j, res;
-	subprog_num = dbg.size();
-	printf(
-			"***********************start_printing_debug_info***********************\n");
-	for (i = 0; i < subprog_num; i++) {
-		cout << "function:" << dbg.at(i).subprog_name << endl;
-		var_num = dbg.at(i).variable.size();
-		for (j = 0; j < var_num; j++) {
-			cout << "var_name:" << dbg.at(i).variable.at(j)->var_name;
-			if (dbg.at(i).variable.at(j)->array_pos != -1) {
-				printf("[%d]\n", dbg.at(i).variable.at(j)->array_pos);
-			} else {
-				printf("\n");
+//static void print_debug_info(vector<subprog> dbg) {
+//	unsigned int subprog_num, var_num;
+//	Dwarf_Error error = 0;
+//	int i, j, res;
+//	subprog_num = dbg.size();
+//	printf(
+//			"***********************start_printing_debug_info***********************\n");
+//	for (i = 0; i < subprog_num; i++) {
+//		cout << "function:" << dbg.at(i).subprog_name << endl;
+//		var_num = dbg.at(i).variable.size();
+//		for (j = 0; j < var_num; j++) {
+//			cout << "var_name:" << dbg.at(i).variable.at(j)->var_name;
+//			if (dbg.at(i).variable.at(j)->array_pos != -1) {
+//				printf("[%d]\n", dbg.at(i).variable.at(j)->array_pos);
+//			} else {
+//				printf("\n");
+//			}
+//			printf("\tvar_length:%d\n", dbg.at(i).variable.at(j)->var_length);
+//			if (dbg.at(i).variable.at(j)->loc_type == OFFSET) {
+//				printf("\tvar_location:offset %d\t",
+//						dbg.at(i).variable.at(j)->var_offset.offset);
+//				switch (dbg.at(i).variable.at(j)->var_offset.reg_name) {
+//				case DW_OP_breg4: {
+//					printf("from ESP\n");
+//					break;
+//				}
+//				case DW_OP_breg5: {
+//					printf("from EBP\n");
+//					break;
+//				}
+//				}
+//			} else if (dbg.at(i).variable.at(j)->loc_type == ADDRESS) {
+//				printf("\tvar_location:address %x\n",
+//						dbg.at(i).variable.at(j)->var_addr);
+//			}
+//
+//			/*Print signed or unsigned */
+//			if (dbg.at(i).variable.at(j)->su_type == DW_ATE_unsigned
+//					|| dbg.at(i).variable.at(j)->su_type == DW_ATE_unsigned_char) {
+//				printf("\tvar_type: Unsigned\n");
+//			} else if (dbg.at(i).variable.at(j)->su_type == DW_ATE_signed
+//					|| dbg.at(i).variable.at(j)->su_type == DW_ATE_signed_char) {
+//				printf("\tvar_type: Signed\n");
+//			} else if (dbg.at(i).variable.at(j)->su_type == 0) {
+//				printf("\tPointer\n");
+//
+//				/*Print pointed*/
+//				printf("\t\tType offset :%x\n", dbg.at(i).variable.at(j)->pointed_info.offset);
+//				printf("\t\struct offset :%d\n", dbg.at(i).variable.at(j)->pointed_info.offset_strucr);
+//				if(dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_unsigned
+//						|| dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_unsigned_char){
+//					printf("\t\t\tvar_type: Unsigned\n");
+//				}else if(dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_signed
+//						|| dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_signed_char){
+//					printf("\t\t\tvar_type: Signed\n");
+//				}else if(dbg.at(i).variable.at(j)->pointed_info.su_type == 0){
+//					printf("\t\t\tPointer\n");
+//				}
+//			}
+//
+//
+//
+//		}
+//	}
+//}
+
+//==========================================================================================X
+//Functions for reading dbg info of libc
+
+bool libcdbg_read_cu(Dwarf_Debug dbg, string funcname, Dwarf_Die *ret){
+
+	Dwarf_Unsigned cu_header_length = 0;
+	Dwarf_Half version_stamp = 0;
+	Dwarf_Unsigned abbrev_offset = 0;
+	Dwarf_Half address_size = 0;
+	Dwarf_Unsigned next_cu_header = 0;
+	Dwarf_Error error;
+	bool result = false;
+	int cu_number = 0;
+
+	for (;; ++cu_number) {
+		Dwarf_Die no_die = 0;
+		Dwarf_Die cu_die = 0;
+		int res = DW_DLV_ERROR;
+		res = dwarf_next_cu_header(dbg, &cu_header_length, &version_stamp, &abbrev_offset, &address_size, &next_cu_header, &error);
+		if (res == DW_DLV_ERROR) {
+			printf("Error in dwarf_next_cu_header\n");
+			exit(1);
+		}
+		if (res == DW_DLV_NO_ENTRY) {
+			/* Done. */
+			break;
+		}
+		/* The CU will have a single sibling, a cu_die. */
+		res = dwarf_siblingof(dbg, no_die, &cu_die, &error);
+		if (res == DW_DLV_ERROR) {
+			printf("Error in dwarf_siblingof on CU die \n");
+			exit(1);
+		}
+		if (res == DW_DLV_NO_ENTRY) {
+			/* Impossible case. */
+			printf("no entry! in dwarf_siblingof on CU die \n");
+			exit(1);
+		}
+		result = get_libcfunc_die(dbg, funcname, cu_die, ret, 0);
+		if(result == true){
+			break;
+		}
+		//dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
+	}
+
+	return result;
+}
+
+bool get_libcfunc_die(Dwarf_Debug dbg, string funcname, Dwarf_Die in_die, Dwarf_Die *ret, int in_level){
+	int res = DW_DLV_ERROR;
+	Dwarf_Die cur_die = in_die;
+	Dwarf_Die child = 0;
+	Dwarf_Error error;
+	bool result = false;
+
+	result  = check_funcname(dbg, funcname, in_die, ret, in_level);
+
+	if(result == false){
+		for (;;) {
+			Dwarf_Die sib_die = 0;
+			res = dwarf_child(cur_die, &child, &error);
+			if (res == DW_DLV_ERROR) {
+				printf("Error in dwarf_child , level %d \n", in_level);
+				exit(1);
 			}
-			printf("\tvar_length:%d\n", dbg.at(i).variable.at(j)->var_length);
-			if (dbg.at(i).variable.at(j)->loc_type == OFFSET) {
-				printf("\tvar_location:offset %d\t",
-						dbg.at(i).variable.at(j)->var_offset.offset);
-				switch (dbg.at(i).variable.at(j)->var_offset.reg_name) {
-				case DW_OP_breg4: {
-					printf("from ESP\n");
+			if (res == DW_DLV_NO_ENTRY) {
+				/* Done at this level. */
+				//printf("No child in this level\n");
+				//break;
+			}
+			if (res == DW_DLV_OK) {
+				result = get_libcfunc_die(dbg, funcname, child, ret, in_level + 1);
+				if(result == true){
 					break;
 				}
-				case DW_OP_breg5: {
-					printf("from EBP\n");
-					break;
-				}
-				}
-			} else if (dbg.at(i).variable.at(j)->loc_type == ADDRESS) {
-				printf("\tvar_location:address %x\n",
-						dbg.at(i).variable.at(j)->var_addr);
 			}
 
-			/*Print signed or unsigned */
-			if (dbg.at(i).variable.at(j)->su_type == DW_ATE_unsigned
-					|| dbg.at(i).variable.at(j)->su_type == DW_ATE_unsigned_char) {
-				printf("\tvar_type: Unsigned\n");
-			} else if (dbg.at(i).variable.at(j)->su_type == DW_ATE_signed
-					|| dbg.at(i).variable.at(j)->su_type == DW_ATE_signed_char) {
-				printf("\tvar_type: Signed\n");
-			} else if (dbg.at(i).variable.at(j)->su_type == 0) {
-				printf("\tPointer\n");
-
-				/*Print pointed*/
-				printf("\t\tType offset :%x\n", dbg.at(i).variable.at(j)->pointed_info.offset);
-				printf("\t\struct offset :%d\n", dbg.at(i).variable.at(j)->pointed_info.offset_strucr);
-				if(dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_unsigned
-						|| dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_unsigned_char){
-					printf("\t\t\tvar_type: Unsigned\n");
-				}else if(dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_signed
-						|| dbg.at(i).variable.at(j)->pointed_info.su_type == DW_ATE_signed_char){
-					printf("\t\t\tvar_type: Signed\n");
-				}else if(dbg.at(i).variable.at(j)->pointed_info.su_type == 0){
-					printf("\t\t\tPointer\n");
-				}
+			res = dwarf_siblingof(dbg, cur_die, &sib_die, &error);
+			if (res == DW_DLV_ERROR) {
+				printf("Error in dwarf_siblingof , level %d \n", in_level);
+				exit(1);
+			}
+			if (res == DW_DLV_NO_ENTRY) {
+				/* Done at this level. */
+				//printf("No sibling in this level\n");
+				break;
 			}
 
-
-
+			if (cur_die != in_die) {
+				dwarf_dealloc(dbg, cur_die, DW_DLA_DIE);
+			}
+			cur_die = sib_die;
+			result = check_funcname(dbg, funcname, cur_die, ret, in_level);
+			if(result == true){
+				break;
+			}
 		}
 	}
+
+	return result;
+}
+
+bool check_funcname(Dwarf_Debug dbg, string funcname, Dwarf_Die die, Dwarf_Die *ret, int level){
+	string name;
+	Dwarf_Error error = 0;
+	Dwarf_Half tag = 0;
+	int res;
+	bool result = false;
+
+	res = dwarf_tag(die, &tag, &error);
+	if (res != DW_DLV_OK) {
+		printf("Error in dwarf_tag , level %d \n", level);
+		exit(1);
+	}
+
+	if (tag == DW_TAG_subprogram && level == 1) {
+		result = get_die_name(die, name);
+		if(result == false){
+//			string msg = funcname+":subprogram doesn't have name?";
+//			perror(msg.c_str());
+			return false;
+		}
+		//cout<<"die name:"<<name<<endl;
+		if(name == funcname || name == "__"+funcname || name == "_IO_"+funcname || name == "_IO_new_"+funcname){
+			*ret = die;
+			cout<<name<<"<=>"<<funcname<<endl;
+			return true;
+		}
+	}
+
+	return false;
 }

@@ -1,8 +1,8 @@
 digraph G {
   BB_Entry [label="BB_Entry	\n\n", shape=box];
-  BB_1 [label="BB_1	\n\nlabel pc_0x80484e0:	\nT_32t0:reg32_t = R_ESP_4:reg32_t;	\nT_32t1:reg32_t = mem[T_32t0:reg32_t];	\nT_32t2:reg32_t = (T_32t0:reg32_t+4:reg32_t);	\nR_ESP_36:reg32_t = T_32t2:reg32_t;	\n", shape=box];
+  BB_1 [label="BB_1	\n\nlabel pc_0x8048590:	\nT_32t0:reg32_t = R_ESP_4:reg32_t;	\nT_32t1:reg32_t = mem[T_32t0:reg32_t];	\nT_32t2:reg32_t = (T_32t0:reg32_t+4:reg32_t);	\nR_ESP_36:reg32_t = T_32t2:reg32_t;	\n", shape=box];
   BB_2 [label="BB_2	\n\n", shape=box];
-  BB_3 [label="BB_3	\n\nlabel L_24:	\n", shape=box];
+  BB_3 [label="BB_3	\n\nlabel L_27:	\n", shape=box];
   BB_Exit [label="BB_Exit	\n\n", shape=box];
 BB_Entry -> BB_1;
 BB_1 -> BB_2;

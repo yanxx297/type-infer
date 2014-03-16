@@ -20,6 +20,7 @@ public:
 	;
 	string tostring() const;
 	static void destroy(Tmp_s *expr);
+	bool cmp_tmp(Tmp_s *tmp);
 
 	int index;
 };

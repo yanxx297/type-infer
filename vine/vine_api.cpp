@@ -432,7 +432,7 @@ fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * 
 	for (j = 0; j < function_list->len; j++) {
 		for (k = 0; k < function_list->block_list[j]->blen; k++) {
 			if (check_stmt_type(function_list->block_list[j]->block[k]->stmt_type) == NO) {
-				function_list->block_list[j]->blen = i - 1;
+				function_list->block_list[j]->blen = k - 1;
 			}
 		}
 	}
@@ -1663,6 +1663,15 @@ void set_value(fblock_ptr func_block) {
 	for (i = 0; i < func_block->len; i++) {
 		for (j = 0; j < func_block->block_list[i]->blen; j++) {
 			switch (func_block->block_list[i]->block[j]->stmt_type) {
+			case SPECIAL:{
+				/*Renew eax after each special("call")*/
+				Special *sp = (Special *)func_block->block_list[i]->block[j];
+				if(sp->special == "call"){
+					global_counter ++;
+					current_number[R_EAX] = global_counter;
+				}
+				break;
+			}
 			case MOVE: {
 				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type
 						== TEMP

@@ -75,7 +75,7 @@ bool get_die_name(Dwarf_Die die, string &ret){
 	}
 
 	ret = std::string(name);
-	cout<<"get_die_name:"<<ret<<endl;
+	//cout<<"get_die_name:"<<ret<<endl;
 	result = true;
 
 	return result;
@@ -324,6 +324,7 @@ bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
 	return result;
 }
 
+//get size from type Die
 bool get_die_size(Dwarf_Die typeDie, int *ret){
 	bool result;
 
@@ -413,9 +414,11 @@ bool get_die_su(Dwarf_Die typeDie, sign_type_t *ret){
 	/*set default*/
 	*ret = UNKNOW_T;
 
+
+
 	res = dwarf_attr(typeDie, DW_AT_encoding, &attr, &error);
 	if (res != DW_DLV_OK) {
-		perror("var has no s/u attr");
+		perror("get_die_su(): var has no s/u attr");
 		return result;
 	}
 	res = dwarf_formudata(attr, &s_u, &error);
@@ -795,7 +798,65 @@ void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariabl
 		/*switch to next DIE*/
 		res = dwarf_siblingof(dbg, cur_die, &cur_die, &error);
 	}
-
-
 }
 
+//==========================================================================================X
+//Functions that combine above functions for more specific aims
+
+//return the s/u type of die directly, instead of return s/u from a type Die
+bool get_su(Dwarf_Debug dbg, Dwarf_Die die, sign_type_t *ret){
+	bool result;
+	Dwarf_Off type_off;
+	Dwarf_Die type_die = die;
+	Dwarf_Half tag;
+	sign_type_t su_ret;
+
+	do{
+		result = get_die_type(dbg, type_die, &type_die, &type_off);
+		if(result == false){
+			return false;
+		}
+		result = get_die_tag(type_die, &tag);
+		if(result == false){
+			return false;
+		}
+	}while(tag == DW_TAG_pointer_type);
+
+	result = get_die_su(type_die, &su_ret);
+	if(result == true){
+		*ret = su_ret;
+	}else{
+		return false;
+	}
+
+	return true;
+}
+
+//return the size of die
+//die -> die's type die -> die's size
+//ret = 4 or 8
+bool get_length(Dwarf_Debug dbg, Dwarf_Die die, int *ret){
+	bool result;
+	Dwarf_Off type_off;
+	Dwarf_Die type_die;
+	result = get_die_type(dbg, die, &type_die, &type_off);
+	if(result == true){
+		int size;
+		result = get_die_size(type_die, &size);
+		if(result == true){
+			if(size <= 4){
+				*ret = 4;
+			}else{
+				*ret = 8;
+				//FIXME: Any variable larger than 16 bytes?
+			}
+			return true;
+		}else{
+			return false;
+		}
+	}else{
+		return false;
+	}
+
+	return false;
+}

@@ -34,6 +34,7 @@ dvariable::dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> fram
 	/*name*/
 	get_die_name(die_var, name);
 	this->var_name = name;
+	cout<<"[dvar] create source "<<name<<endl;
 
 	/*type offset*/
 	get_die_type(dbg, die_var, &die_type, &off_type);
@@ -54,7 +55,9 @@ dvariable::dvariable(dvariable &source){
 	this->parent = source.parent;
 
 	if(source.leaf == false){
-		this->leaf == false;
+		this->leaf = false;
+	}else{
+		this->leaf = true;
 	}
 
 	for(i = 0; i < source.loclist.size(); i++){
@@ -423,9 +426,12 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 		if(tmp != 0){
 			this->var = tmp;
 			this->leaf = true;
+			//cout<<this->var_name<<"is a leaf"<<endl;
 			return;
 		}
 
+		//cout<<this->var_name<<"is not a leaf (leaf = false)"<<endl;
+		this->leaf = false;
 		Dwarf_Half tag_target_type = 0;
 		get_die_tag(die_target_type, &tag_target_type);
 		switch(tag_target_type){

@@ -11,6 +11,8 @@
 #define US "us.txt"
 #define SNK "sn.txt"
 #define UNK "un.txt"
+#define DBGLIB "libc-2.15.so"	//path of libc's debug info on :/usr/lib/debug/lib/i386-linux-gnu
+									//should be avaliable by default
 
 typedef enum{
 	DVAR_BASE = 0,
@@ -30,6 +32,44 @@ typedef enum{
 	YES = 99,
 	NO,
 }BOOL;
+
+enum hardcode_func_t{
+	IFUNC_STRCAT,
+	IFUNC_INDEX,
+	IFUNC_STRCMP,
+	IFUNC_STRCPY,
+	IFUNC_STRCSPN,
+	IFUNC_STRLEN,
+	IFUNC_STRNLEN,
+	IFUNC_STRNCAT,
+	IFUNC_STRNCMP,
+	IFUNC_STRNCPY,
+	IFUNC_RINDEX,
+	IFUNC_STRPBRK,
+	IFUNC_STRSPN,
+	IFUNC_MEMCHR,
+	IFUNC_BCMP,
+	IFUNC_MEMMOVE,
+	IFUNC_MEMSET,
+	IFUNC_MEMPCPY,
+	IFUNC_BCOPY,
+	IFUNC_BZERO,
+	IFUNC_STPCPY,
+	IFUNC_STPNCPY,
+	IFUNC_STRCASECMP,
+	IFUNC_STRNCASECMP,
+	IFUNC_MEMCPY,
+	IFUNC_RAWMEMCHR,
+	IFUNC_MEMRCHR,
+	IFUNC_STRSTR,
+	IFUNC_STRCASESTR,
+	IFUNC_WCSCHR,
+	IFUNC_WCSCMP,
+	IFUNC_WCSCPY,
+	IFUNC_WCSLEN,
+	IFUNC_WCSRCHR,
+	IFUNC_WMEMCMP,
+};
 
 static std::string binop_label[] = {
 		  "+",
@@ -55,6 +95,44 @@ static std::string binop_label[] = {
 		  "<=",
 		  "/$",
 		  "%$"
+};
+
+static std::string indirect[] = {
+		"strcat",
+		"index",
+		"strcmp",
+		"strcpy",
+		"strcspn",
+		"strlen",
+		"strnlen",
+		"strncat",
+		"strncmp",
+		"strncpy",
+		"rindex",
+		"strpbrk",
+		"strspn",
+		"memchr",
+		"bcmp",
+		"memmove",
+		"memset",
+		"mempcpy",
+		"bcopy",
+		"bzero",
+		"stpcpy",
+		"stpncpy",
+		"strcasecmp",
+		"strncasecmp",
+		"memcpy",
+		"rawmemchr",
+		"memrchr",
+		"strstr",
+		"strcasestr",
+		"wcschr",
+		"wcscmp",
+		"wcscpy",
+		"wcslen",
+		"wcsrchr",
+		"wmemcmp"
 };
 
 static std::string unop_label[] = {"NEG", "NOT"};

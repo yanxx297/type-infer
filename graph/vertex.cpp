@@ -67,14 +67,31 @@ bool Pointed::cmp_ptr_type(dvariable * ptr){
 	if(this->debug_info_list.at(0)->cmp_type(ptr) == true){
 		/*Check whether in the same structure*/
 		/*If yes, then not treated as the same type*/
-//		dvariable *myparent = this->debug_info_list.at(0)->parent;
-//		dvariable *parent = ptr->parent;
-//		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
-//			result = YES;
-//		}
+		dvariable *myparent = this->debug_info_list.at(0)->parent;
+		dvariable *parent = ptr->parent;
+		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
+			result = YES;
+		}
 		result = true;
 	}
 	return result;
+}
+
+//Compare two ptargets based on name and size
+//For check_call_pointer()
+bool Pointed::cmp_pointed(Pointed *ptr){
+	cout<<ptr->debug_info_list.at(0)->var_name<<"v.s."<<this->debug_info_list.at(0)->var_name<<endl;
+	if(ptr->debug_info_list.at(0)->var_length != this->debug_info_list.at(0)->var_length){
+		return false;
+	}
+
+	if(ptr->ptr_name == this->ptr_name){
+		return true;
+	}else if(ptr->debug_info_list.at(0)->var_name == this->debug_info_list.at(0)->var_name){
+		return true;
+	}
+
+	return false;
 }
 
 Register::Register(Exp *reg_info,Graph::vertex_descriptor descriptor)
