@@ -32,7 +32,7 @@ dvariable::dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> fram
 	string name;
 
 	/*name*/
-	get_die_name(die_var, name);
+	get_die_name(dbg, die_var, name);
 	this->var_name = name;
 	cout<<"[dvar] create source "<<name<<endl;
 
@@ -42,7 +42,7 @@ dvariable::dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> fram
 
 	/*location list*/
 	cout<<this->var_name<<" get loc_list:"<<endl;
-	get_die_loclist(die_var, this->loclist, frame_base);
+	get_die_loclist(dbg, die_var, this->loclist, frame_base);
 }
 
 dvariable::dvariable(dvariable &source){
@@ -119,14 +119,11 @@ bool dvariable::cmp_type(dvariable *input){
 bool dvariable::cmp_loc(Exp *exp, address_t pc){
 	//cout<<"\tlook for "<<exp->tostring()<<endl;
 	bool result = false;
-	if(exp->exp_type != MEM){
-		return result;
-	}
-	Mem *mem = (Mem *)exp;
-	if(mem->addr->exp_type == BINOP){
+
+	if(exp->exp_type == BINOP){
 		int offset = 0;
 		string regname;
-		BinOp * bop = (BinOp *)mem->addr;
+		BinOp * bop = (BinOp *)exp;
 		if(bop->lhs->exp_type == TEMP && bop->rhs->exp_type == CONSTANT){
 			offset = handle_constant(((Constant *)bop->rhs)->val);
 			regname = ((Temp *)bop->lhs)->name;
@@ -141,6 +138,31 @@ bool dvariable::cmp_loc(Exp *exp, address_t pc){
 		}else if(bop->rhs->exp_type == TEMP && bop->lhs->exp_type == CONSTANT){
 			offset = handle_constant(((Constant *)bop->lhs)->val);
 			regname = ((Temp *)bop->rhs)->name;
+		}else if((bop->lhs->exp_type == BINOP && bop->rhs->exp_type == CONSTANT) ||
+				(bop->rhs->exp_type == BINOP && bop->lhs->exp_type == CONSTANT)){
+			BinOp *base = 0;
+			if(bop->lhs->exp_type == BINOP &&
+					((BinOp *)bop->lhs)->binop_type == PLUS){
+				base = ((BinOp *)bop->lhs);
+				offset = handle_constant(((Constant *)bop->rhs)->val);
+			}else if(bop->rhs->exp_type == BINOP &&
+					((BinOp *)bop->rhs)->binop_type == PLUS){
+				base = ((BinOp *)bop->rhs);
+				offset = handle_constant(((Constant *)bop->lhs)->val);
+			}else{
+				return false;
+			}
+
+			if(base->lhs->exp_type == BINOP && ((BinOp *)base->lhs)->binop_type == LSHIFT &&
+					is_tmps(base->rhs) == true){
+				regname = ((Tmp_s *)base->rhs)->name;
+			}else if(base->rhs->exp_type == BINOP && ((BinOp *)base->rhs)->binop_type == LSHIFT &&
+					is_tmps(base->lhs) == true){
+				regname = ((Tmp_s *)base->lhs)->name;
+			}else{
+				return false;
+			}
+
 		}else{
 			return result;
 		}
@@ -152,22 +174,25 @@ bool dvariable::cmp_loc(Exp *exp, address_t pc){
 			//cout<<"\t\tfind "<<this->var_name<<endl;
 			return result;
 		}
-	}else if(mem->addr->exp_type == TEMP){
+	}else if(exp->exp_type == TEMP){
 		string regname;
-		Temp *tmp = (Temp *)mem->addr;
+		Temp *tmp = (Temp *)exp;
 		regname = tmp->name;
 		if(cmp_offset_loc(regname, 0, pc, this) == true){
 			result = true;
 			return result;
 		}
-	}else if(mem->addr->exp_type == CONSTANT){
+	}else if(exp->exp_type == CONSTANT){
 		/*constant address used by global or static*/
 		int i;
 		for(i = 0; i < this->loclist.size(); i++){
 			if(this->loclist.at(i)->loc_type == ADDR_LOC){
-				if(this->loclist.at(i)->loc_cmp(mem, pc) == true){
-					result = true;
-					return result;
+				addr_loc *addr = (addr_loc *)this->loclist.at(i);
+				if(exp->exp_type == CONSTANT){
+					Constant *t_con = (Constant *)exp;
+					if(t_con->val == addr->addr){
+						return true;
+					}
 				}
 			}
 		}
@@ -192,6 +217,15 @@ bool dvariable::cmp_reg(Exp *exp, address_t pc){
 		}
 	}
 	return result;
+}
+
+/*Given a child, return the type of its oldest parent (which is the original type of this variable)*/
+DVAR_TYPE_T dvariable::original_type(){
+	dvariable *ptr = this;
+	while(ptr->parent != 0){
+		ptr = ptr->parent;
+	}
+	return ptr->var_struct_type;
 }
 
 dbase::dbase(dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
@@ -267,7 +301,7 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 	while(res == DW_DLV_OK){
 		/*get offset*/
 		int offset = 0;
-		get_die_offset(die_member, &offset);
+		get_die_offset(dbg, die_member, &offset);
 
 		/*get this member, push into vector*/
 		get_die_tag(die_member, &tag_member);
@@ -276,7 +310,7 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 
 			/*get member name*/
 			string member_name;
-			get_die_name(die_member, member_name);
+			get_die_name(dbg, die_member, member_name);
 			member_source->var_name = member_name;
 
 			Dwarf_Die die_member_type = 0;
@@ -482,11 +516,11 @@ subprogram::subprogram(Dwarf_Debug dbg, Dwarf_Die die_subprog){
 	string name;
 
 	/*set subprogram name*/
-	get_die_name(die_subprog, name);
+	get_die_name(dbg, die_subprog, name);
 	this->name = name;
 
 	/*set frame base*/
-	get_frame_base(die_subprog, this->frame_base);
+	get_frame_base(dbg, die_subprog, this->frame_base);
 
 	/*push variables into vector*/
 	handle_child_and_sibling(dbg, die_subprog, this->var_list, this->frame_base);

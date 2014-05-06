@@ -39,7 +39,13 @@ vertex::vertex(vertex_type_t vertex_type, Graph::vertex_descriptor descriptor)
 
 Variable::Variable(dbase *debug_info, Graph::vertex_descriptor descriptor, string name)
 :vertex(VARIABLE,descriptor),debug_info(debug_info), var_name(name), infered_su(UNSIGNED_T)
-{}
+{
+	//cout<<this->var_name<<"'s copy list size:"<<this->field_copy_list.size()<<endl;
+	}
+
+Variable::~Variable(){
+	this->field_copy_list.clear();
+}
 
 Pointed::Pointed(dbase *debug_info, Graph::vertex_descriptor descriptor, string name)
 :vertex(POINTED,descriptor), ptr_name(name), infered_su(UNSIGNED_T)
@@ -48,6 +54,10 @@ Pointed::Pointed(dbase *debug_info, Graph::vertex_descriptor descriptor, string 
 	//this->id_oddset = debug_info->pointed_info.offset;
 	//this->struct_offset = debug_info->pointed_info.offset_strucr;
 	this->Add_into_list(debug_info);
+}
+
+Pointed::~Pointed(){
+	this->debug_info_list.clear();
 }
 
 void Pointed::Add_into_list(dbase *debug_info){
@@ -85,9 +95,25 @@ bool Pointed::cmp_pointed(Pointed *ptr){
 		return false;
 	}
 
-	if(ptr->ptr_name == this->ptr_name){
-		return true;
-	}else if(ptr->debug_info_list.at(0)->var_name == this->debug_info_list.at(0)->var_name){
+	/*Map by name*/
+//	if(ptr->ptr_name == this->ptr_name){
+//		return true;
+//	}else if(ptr->debug_info_list.at(0)->var_name == this->debug_info_list.at(0)->var_name){
+//		return true;
+//	}
+
+	/*map by offset in a specific structure*/
+	if(ptr->debug_info_list.at(0)->parent->parent != 0 &&
+			this->debug_info_list.at(0)->parent->parent != 0 &&
+			ptr->debug_info_list.at(0)->parent->parent->parent == 0 &&
+			this->debug_info_list.at(0)->parent->parent->parent == 0){
+		/*Don't check parent name if its a var name (var->ptr->struct->base), instead of a struct name*/
+	}else{
+		if(ptr->debug_info_list.at(0)->parent->var_name != this->debug_info_list.at(0)->parent->var_name){
+			return false;
+		}
+	}
+	if(ptr->debug_info_list.at(0)->s_offset == this->debug_info_list.at(0)->s_offset){
 		return true;
 	}
 
@@ -117,6 +143,11 @@ pointer_info::pointer_info(dptr *debug_info)
 :debug_info(debug_info)
 {}
 
+pointer_info::~pointer_info(){
+	this->child_list.clear();
+	this->copy_list.clear();
+}
+
 string pointer_info::tostring(){
 	string res;
 	int i;
@@ -138,6 +169,14 @@ void pointer_info::print_copylist(){
 }
 
 pointer_list::pointer_list(){}
+
+void pointer_list::clear(){
+	int i;
+	for(i = 0; i < this->plist.size(); i++){
+		delete this->plist.at(i);
+	}
+	this->plist.clear();
+}
 
 bool pointer_list::add_pointer(dptr *debug_info){
 	int i;
@@ -185,6 +224,41 @@ void pointer_list::print_copylists(){
 
 //----------------------------------------------------------------------------------------------------------------X
 //Common utils
+
+//clean a func_vertex_block struct pointed by pointer
+func_vertex_block::~func_vertex_block(){
+	int i;
+
+	/*clean var list*/
+	for(i = 0; i < this->variable_list.size(); i++){
+		delete this->variable_list.at(i);
+	}
+	this->variable_list.clear();
+
+	/*clean reg list*/
+	for(i = 0; i < this->reg_list.size(); i++){
+		delete this->reg_list.at(i);
+	}
+	this->reg_list.clear();
+
+	/*clean op list*/
+	for(i = 0; i < this->op_list.size(); i++){
+		delete this->op_list.at(i);
+	}
+	this->op_list.clear();
+
+	/*clean ptarget list*/
+	for(i = 0; i < this->ptarget_list.size(); i++){
+		delete this->ptarget_list.at(i);
+	}
+	this->variable_list.clear();
+
+	/*clean (ssa form) IR list*/
+	delete this->stmt_block;
+
+	/*clean pointer list*/
+	this->ptr_list.clear();
+}
 
 //check whether var_c is a child of var_p in debug_info structure
 bool check_child(dvariable *var_p, dvariable *var_c){

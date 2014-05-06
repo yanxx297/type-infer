@@ -138,12 +138,14 @@ typedef enum{
 
 struct basic_block {
 	Stmt **block;
-	int blen; // Number of stmts in this basic block
+	int blen; // Nu mber of stmts in this basic block
 	BRACH branch_type;
 	TYPE type;
 	int child_next;/*default child if there is only one children for this node*/
 	int child_jmp;
 	asm_function_t *func;
+
+	~basic_block();
 };
 
 typedef struct basic_block* bblock_ptr;
@@ -152,6 +154,8 @@ struct func_block{
 	bblock_ptr *block_list;
 	int len; //Number of basic blocks in this function
 	asm_function_t *func;
+
+	~func_block();
 };
 
 struct idom{

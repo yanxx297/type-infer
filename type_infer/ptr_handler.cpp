@@ -225,6 +225,8 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 			/* reg1 = mem[reg2 (+ cons)]*/
 			type = 1;
 			mem = (Mem *)exp->rhs;
+		}else{
+			return;
 		}
 
 		if(type == 1){
@@ -251,7 +253,7 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 
 			for(i = 0; i < func_block->ptr_list.getsize(); i++){
 				dptr * ptr = func_block->ptr_list.plist.at(i)->debug_info;
-				if(ptr->cmp_loc(mem, pc) == true){
+				if(ptr->cmp_loc(mem->addr, pc) == true){
 					func_block->ptr_list.plist.at(i)->copy_list.push_back(reg1);
 					return;
 				}else{

@@ -24,7 +24,7 @@ int search_reg(func_vertex_ptr func_list, Tmp_s *target);
 int search_var(func_vertex_ptr func_list, int block, int stmt, Mem *target);
 int search_op(func_vertex_ptr func_list, int block, int stmt, Exp *target);
 Graph::vertex_descriptor node_searcher(func_vertex_ptr func_list, int block, int stmt, Exp *target);
-bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, Tmp_s *target, Exp *&res);
+bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *block, int *stmt, Tmp_s *target, Exp *&res);
 bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g);
 bool cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g);
 void smod_operand_handler(func_vertex_ptr func_block, Graph::vertex_descriptor operand_binop, Graph::vertex_descriptor operand_var,  Graph& g);
@@ -42,15 +42,21 @@ bool compare_exp(Exp *former, Exp *latter);
 string get_full_name(dbase *var);
 
 Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g);
+bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int block, int stmt, Move *mov, Graph::vertex_descriptor op, Graph &g);
 
 void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::vertex_descriptor v_src, Graph &g);
 void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, string func_name, Graph &g);
+void check_func(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, string func_name, Graph &g);
 bool get_prev_stmt(fblock_ptr vine_ir_block, int block, int stmt, int *b, int *s);
 bool check_param(Stmt *stmt, int offset);
 
 bool get_next_stmt(fblock_ptr vine_ir_block, int block, int stmt, int *b, int *s);
-bool set_edge(func_vertex_ptr func_list,Dwarf_Debug dbg, Dwarf_Die param, int block, int stmt, int *new_offset, Exp *current_exp, Graph &g);
-bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, func_vertex_ptr func_list, int block, int stmt, Exp *exp, Graph &g);
+bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list,Dwarf_Debug dbg, Dwarf_Die param, int block, int stmt, int *new_offset, Exp *current_exp, Graph &g);
+bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, Exp *exp, Graph &g);
 bool is_single_ptr(dptr *ptr, dvariable *&ret);
 void push_lib_var(dvariable *var, vector<Pointed *> &ptarget_list);
+
+bool get_return_value(fblock_ptr vine_ir_block, int block, int stmt, int *ret_block, int *ret_stmt, Exp *&ret);
+bool get_xth_param(fblock_ptr vine_ir_block, int offset, int block, int stmt, int *ret_block, int *ret_stmt,Exp *&ret);
+bool set_single_edge(func_vertex_ptr func_list, Exp *exp, int block, int stmt, sign_type_t signedness, Graph &g);
 #endif /* INFER_H_ */

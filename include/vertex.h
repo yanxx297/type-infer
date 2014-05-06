@@ -94,14 +94,19 @@ public:
 class Variable: public vertex{
 public:
 	Variable(dbase *debug_info, Graph::vertex_descriptor descriptor, string name);
+	~Variable();
 	dbase *debug_info;
 	string var_name;
 	sign_type_t infered_su;
+
+	/*copy list: currently only used for array access*/
+	vector<Tmp_s *> field_copy_list;
 };
 
 class Pointed: public vertex{
 public:
 	Pointed(dbase *debug_info, Graph::vertex_descriptor descriptor, string name);
+	~Pointed();
 	void Add_into_list(dbase *debug_info);
 	bool cmp_ptr_type(dvariable * ptr);
 	bool cmp_pointed(Pointed *ptr);
@@ -146,6 +151,7 @@ public:
 class pointer_info{
 public:
 	pointer_info(dptr *debug_info);
+	~pointer_info();
 	string tostring();
 	void print_copylist();
 
@@ -157,6 +163,7 @@ public:
 class pointer_list{
 public:
 	pointer_list();
+	void clear();
 	bool add_pointer(dptr *debug_info);
 	void print_plist();
 	int getsize();
@@ -184,19 +191,12 @@ struct func_vertex_block{
 	Graph::vertex_descriptor s_des;
 	Graph::vertex_descriptor u_des;
 	fblock_ptr stmt_block;
+
+	~func_vertex_block();
 };
 
 typedef func_vertex_block * func_vertex_ptr;
 
-//void print_variable_list(func_vertex_ptr *func_list, int len);
-//void push_variable(subprogram *prog, func_vertex_ptr func_list, Graph& g);
-//int search_by_func_name(func_vertex_ptr func_block, fblock_ptr *vine_ir_block);
-//int push_register(func_vertex_ptr func_block, Tmp_s *reg_tmp, Graph& g);
-//Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, Exp *exp, Graph& g, boost::property_map < Graph, boost::edge_reverse_t >::type& rev);
-//void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g, boost::property_map < Graph, boost::edge_reverse_t >::type& rev);
-//
-//int search_op(func_vertex_ptr func_list, int block, int stmt, Exp *target);
-//int search_reg(func_vertex_ptr func_list, Tmp_s *target);
 
 bool check_child(dvariable *var_p, dvariable *var_c);
 bool check_child_from_parent(dvariable *var_p, dvariable *var_c);

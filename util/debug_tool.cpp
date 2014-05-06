@@ -174,3 +174,12 @@ void id_to_vineir(func_vertex_ptr func_block, Graph &g){
 
 	fclose(fp);
 }
+
+void print_ptargetlist(vector<Pointed *> &list){
+	int i;
+	cout<<"print ptarget list"<<endl;
+	for(i = 0; i < list.size(); i++){
+		list.at(i)->debug_info_list.at(0)->print_me();
+		cout<<"parent struct:"<<list.at(i)->debug_info_list.at(0)->parent->var_name<<endl;
+	}
+}

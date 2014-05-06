@@ -623,6 +623,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 			case SPECIAL:{
 				Special *t_special = (Special *)vine_ir_block->block_list[j]->block[k];
 				if(t_special->special == "call"){
+					//break;
 					//Can be dynamic or static
 					//Currently ignore static. Will enable static in future, and uses addr range to distinguish
 
@@ -667,6 +668,18 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 				Graph::vertex_descriptor v_r;// = boost::add_vertex(g);
 				v_l = read_exp(func_list, j, k, ((Move *)vine_ir_block->block_list[j]->block[k])->lhs, g);
 				v_r = read_exp(func_list, j, k, ((Move *)vine_ir_block->block_list[j]->block[k])->rhs, g);
+
+				if(v_r != -1){
+					if(((Move *)vine_ir_block->block_list[j]->block[k])->rhs->exp_type == BINOP &&
+							is_tmps(((Move *)vine_ir_block->block_list[j]->block[k])->lhs) == true){
+						if(((BinOp *)((Move *)vine_ir_block->block_list[j]->block[k])->rhs)->binop_type == PLUS ||
+								((BinOp *)((Move *)vine_ir_block->block_list[j]->block[k])->rhs)->binop_type == MINUS){
+							//BinOp *rhs = (BinOp *)((Move *)vine_ir_block->block_list[j]->block[k])->rhs;
+							cout<<"[arraylookup]"<<vine_ir_block->block_list[j]->block[k]->tostring()<<endl;
+							array_loopup(vine_ir_block, func_list, j, k, (Move *)vine_ir_block->block_list[j]->block[k], v_r, g);
+						}
+					}
+				}
 
 				if(v_l == -1 || v_r == -1){
 					//NOTE: T will return a -1
@@ -908,11 +921,16 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 
 	printf("***********************Finished handle function[%d] %s***********************\n", func_num, tmp->func->name.c_str());
 
+    //print_ptargetlist(func_list->ptarget_list);
+
 	//    Print out infer result
 	printf(
 			"***********************infer result*******************************\n");
 	printf("%s:\n", func_list->func_name.c_str());
 	print_type_infer_result(func_list, prog->abfd->filename);
+
+	/*Deallocate memory*/
+	delete func_list;
 }
 
 int

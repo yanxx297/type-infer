@@ -29,30 +29,17 @@ using namespace std;
 int cfg_funclist_length;
 struct addr_range* vine_text;
 
-//======================================================================
-//
-// Main
-//
-//======================================================================
+basic_block::~basic_block(){
+	free(this->block);
+}
 
-//int main(int argc, char *argv[])
-//{
-//	int i, j, k;
-//	fblock_ptr *tmp;
-//	tmp = transform_to_ssa(argv[1]);
-//	tmp = tranform_to_tmp_free(tmp, cfg_funclist_length);
-//    for(i = 0; i < cfg_funclist_length; i ++){
-//    	printf("=================function <%s> start====================\n", tmp[i]->func->name.c_str());
-//    	for(j = 0; j < tmp[i]->len; j++){
-//    		printf("BB_%d{\n",j);
-//    		for(k = 0; k < tmp[i]->block_list[j]->blen; k++){
-//    			printf("\t%s\n",tmp[i]->block_list[j]->block[k]->tostring().c_str());
-//    		}
-//    		printf("}\n");
-//    	}
-//    	printf("==================function <%s> end=====================\n", tmp[i]->func->name.c_str());
-//    }
-//}
+func_block::~func_block(){
+	int i;
+	for(i = 0; i < this->len; i++){
+		delete this->block_list[i];
+	}
+	free(this->block_list);
+}
 
 fblock_ptr tranform_to_tmp_free(fblock_ptr func_blocks, int func_num) {
 	int i, j, k;
@@ -1242,22 +1229,6 @@ void add_comment_jmp_inside(fblock_ptr func_block, int j, int k, Exp *target) {
 	}
 }
 
-/*void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
-	if (target->exp_type == NAME) {
-		int index = search_raw_blocks(vine_blocks, ((Name *) target)->name, i);
-		if (index >= 0) {
-			No need to comment
-		} else {
-			Error Jmp that jump to nowhere (indirect jump)
-			comment_stmt(vine_blocks, i, j);
-		}
-	} else if (target->exp_type == TEMP) {
-		Indirect jmp
-		Add comment
-		comment_stmt(vine_blocks, i, j);
-	}
-}*/
-
 void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
 	address_t start_addr = vine_blocks->func->start_addr;
 	address_t end_addr = vine_blocks->func->end_addr;
@@ -1389,32 +1360,7 @@ void add_phi(fblock_ptr func_block) {
 
 	BOOL changed = YES;
 	while (changed == YES) {
-//		printf("big round\n");
-//		changed = NO;
-//		for(i = 1; i < func_block->len; i ++){
-//			int new_idom = get_predecessor(func_block, doms, 0, i);
-//			int next_predecessor = get_predecessor(func_block, doms, new_idom+1, i);
-//			while(next_predecessor != -1){
-//				printf("dom[%d]\tnext_predecessor = %d\n",i, next_predecessor);
-//				if(doms[next_predecessor].processed == YES){
-//					new_idom = intersect(doms, next_predecessor, new_idom);
-//					printf("new_idom = %d\n",new_idom);
-//					if(new_idom == -1){
-////						draw_graph(func_block, func_block->len);
-////						exit(1);
-//					}
-//				}
-//				next_predecessor = get_predecessor(func_block, doms, next_predecessor+1, i);
-//			}
-//
-//			printf("%d:new_idom = %d\n", i, new_idom);
-//			if(doms[i].idom_id != new_idom){
-//				doms[i].idom_id = new_idom;
-//				printf("doms[%d]:changed to %d\n", i, new_idom);
-//				changed = YES;
-//			}
-//			doms[i].processed = YES;
-//		}
+
 		changed = deep_first_search(func_block, 1);
 
 		/*Reset processed*/
@@ -1471,16 +1417,6 @@ void add_phi(fblock_ptr func_block) {
 		}
 	}
 
-	//printf("FDom finished\n");
-
-//	Pretty print dominance frontier sets
-//	for(i = 1; i < func_block->len; i ++){
-//		printf("df[%d]={",i);
-//		for(j = 0; j < df[i].size(); j++){
-//			printf("%d,",df[i].at(j));
-//		}
-//		printf("}\n");
-//	}
 
 	//Add Phi nodes
 	for (i = 0; i < func_block->len; i++) {

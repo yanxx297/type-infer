@@ -463,28 +463,7 @@ void get_struct_ptr(Dwarf_Debug dbg, Dwarf_Die var, Dwarf_Off type_offset, Dwarf
 	Dwarf_Error error = 0;
 	int res;
 
-	/*get name attr*/
-	//string tmp_name;
-//	res = dwarf_diename(var, &name, &error);
-//	if (res == DW_DLV_ERROR) {
-//		exit(1);
-//	}
-//		if (res == DW_DLV_NO_ENTRY) {
-//		name = "<no DW_AT_name attr>";
-//		localname = 1;
-//	}
-
-	//strcat(name, ".");
 	name = set_name(var);
-	//printf("name = %s\n",name.c_str());
-	//curr_var->var_name = tmp_name;
-
-//	res = dwarf_diename(member, &sub_name, &error);
-//	if (res == DW_DLV_ERROR) {
-//		exit(1);
-//	}
-//
-//	tmp_name = std::string(sub_name);
 
 	sub_name = set_name(member);
 	curr_var->var_name = name + "." + sub_name;
@@ -541,11 +520,6 @@ static void print_die_data(Dwarf_Debug dbg, Dwarf_Die print_me, int level) {
 		struct subprog curr_sub;
 
 		/*get name attr*/
-//		res = dwarf_diename(print_me, &name, &error);
-//		if (res == DW_DLV_ERROR) {
-//			printf("Error in dwarf_diename , level %d \n", level);
-//			exit(1);
-//		}
 		curr_sub.subprog_name = set_name(print_me);
 		printf("find subprogram %s\n",curr_sub.subprog_name.c_str());
 
@@ -1171,7 +1145,7 @@ bool libcdbg_read_cu(Dwarf_Debug dbg, string funcname, Dwarf_Die *ret){
 	Dwarf_Unsigned abbrev_offset = 0;
 	Dwarf_Half address_size = 0;
 	Dwarf_Unsigned next_cu_header = 0;
-	Dwarf_Error error;
+	Dwarf_Error error = 0;
 	bool result = false;
 	int cu_number = 0;
 
@@ -1181,8 +1155,11 @@ bool libcdbg_read_cu(Dwarf_Debug dbg, string funcname, Dwarf_Die *ret){
 		int res = DW_DLV_ERROR;
 		res = dwarf_next_cu_header(dbg, &cu_header_length, &version_stamp, &abbrev_offset, &address_size, &next_cu_header, &error);
 		if (res == DW_DLV_ERROR) {
-			printf("Error in dwarf_next_cu_header\n");
-			exit(1);
+			char msg[256];
+			sprintf(msg, "Error in libcdbg_read_cu at %d\n", cu_number);
+			perror(msg);//TODO:__stack_chk_fail and free fail at there in factor:
+			//exit(1);
+			return false;
 		}
 		if (res == DW_DLV_NO_ENTRY) {
 			/* Done. */
@@ -1200,10 +1177,10 @@ bool libcdbg_read_cu(Dwarf_Debug dbg, string funcname, Dwarf_Die *ret){
 			exit(1);
 		}
 		result = get_libcfunc_die(dbg, funcname, cu_die, ret, 0);
+		//dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
 		if(result == true){
 			break;
 		}
-		//dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
 	}
 
 	return result;
@@ -1233,6 +1210,7 @@ bool get_libcfunc_die(Dwarf_Debug dbg, string funcname, Dwarf_Die in_die, Dwarf_
 			}
 			if (res == DW_DLV_OK) {
 				result = get_libcfunc_die(dbg, funcname, child, ret, in_level + 1);
+				dwarf_dealloc(dbg, child, DW_DLA_DIE);
 				if(result == true){
 					break;
 				}
@@ -1250,6 +1228,7 @@ bool get_libcfunc_die(Dwarf_Debug dbg, string funcname, Dwarf_Die in_die, Dwarf_
 			}
 
 			if (cur_die != in_die) {
+				//Dealloc previous DIE
 				dwarf_dealloc(dbg, cur_die, DW_DLA_DIE);
 			}
 			cur_die = sib_die;
@@ -1277,7 +1256,7 @@ bool check_funcname(Dwarf_Debug dbg, string funcname, Dwarf_Die die, Dwarf_Die *
 	}
 
 	if (tag == DW_TAG_subprogram && level == 1) {
-		result = get_die_name(die, name);
+		result = get_die_name(dbg, die, name);
 		if(result == false){
 //			string msg = funcname+":subprogram doesn't have name?";
 //			perror(msg.c_str());

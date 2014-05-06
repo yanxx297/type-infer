@@ -61,7 +61,7 @@ bool check_artificial(Dwarf_Die die){
 	return result;
 }
 
-bool get_die_name(Dwarf_Die die, string &ret){
+bool get_die_name(Dwarf_Debug dbg, Dwarf_Die die, string &ret){
 	bool result = false;
 
 	char *name = 0;
@@ -75,7 +75,7 @@ bool get_die_name(Dwarf_Die die, string &ret){
 	}
 
 	ret = std::string(name);
-	//cout<<"get_die_name:"<<ret<<endl;
+	dwarf_dealloc(dbg,name,DW_DLA_STRING);
 	result = true;
 
 	return result;
@@ -119,25 +119,29 @@ bool get_die_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret, Dwarf_Off *ret
 	res = dwarf_tag(typeDie, &tag, &error);
 	if(res != DW_DLV_OK){
 		perror("fail to get tag of type DIE (get_type)");
-		return result;
+		dwarf_dealloc(dbg, typeDie, DW_DLA_DIE);
+		return false;
 	}
+
 	if(tag == DW_TAG_typedef || tag == DW_TAG_const_type || tag == DW_TAG_subroutine_type){
+		Dwarf_Die prev_type = typeDie;
 		result = get_die_type(dbg, typeDie, &typeDie, &offset);
+		dwarf_dealloc(dbg, prev_type, DW_DLA_DIE);
 		if(result == false){
-			return result;
+			dwarf_dealloc(dbg, typeDie, DW_DLA_DIE);
+			return false;
 		}
 	}else if(tag == DW_TAG_enumeration_type){
-		result = false;
-		return result;
+		dwarf_dealloc(dbg, typeDie, DW_DLA_DIE);
+		return false;
 	}
 
-	result = true;
 	*ret = typeDie;
 	*ret_off = offset;
-	return result;
+	return true;
 }
 
-bool get_die_loclist(Dwarf_Die die, vector<location *> &loc_list, vector<location *> &frame_base){
+bool get_die_loclist(Dwarf_Debug dbg, Dwarf_Die die, vector<location *> &loc_list, vector<location *> &frame_base){
 	bool result = false;
 	Dwarf_Locdesc **llbuf;
 	Dwarf_Loc *locp;
@@ -232,14 +236,19 @@ bool get_die_loclist(Dwarf_Die die, vector<location *> &loc_list, vector<locatio
 				erase_locrecord(highpc, lowpc, loc_list);
 			}
 		}
+
+		dwarf_dealloc(dbg, llbuf[j]->ld_s, DW_DLA_LOC_BLOCK);
+		dwarf_dealloc(dbg,llbuf[j], DW_DLA_LOCDESC);
 	}
 
-	result = true;
-	return result;
+	//dealloc dwarf_loclist_n()
+	dwarf_dealloc(dbg, llbuf, DW_DLA_LIST);
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------------------------X
-bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
+bool get_frame_base(Dwarf_Debug dbg, Dwarf_Die die, vector<location *> &loc_list){
 	bool result = false;
 	Dwarf_Locdesc **llbuf;
 	Dwarf_Loc *locp;
@@ -247,6 +256,7 @@ bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
 	unsigned int entindx;
 	Dwarf_Attribute attr;
 	Dwarf_Signed count;
+	Dwarf_Addr low_pc = 0;
 	Dwarf_Error error = 0;
 	Dwarf_Half tag = 0;
 	int res;
@@ -256,6 +266,19 @@ bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
 		return result;
 	}
 
+	/*get DW_AT_low_pc*/
+	res = dwarf_attr(die, DW_AT_low_pc, &attr, &error);
+	if (res != DW_DLV_OK) {
+		perror("var has no DW_AT_low_pc");
+		return result;
+	}
+	res = dwarf_formaddr(attr, &low_pc, &error);
+	if(res != DW_DLV_OK){
+		perror("Fail to get low_pc addr");
+		return result;
+	}
+
+	/*get frame base*/
 	res = dwarf_attr(die, DW_AT_frame_base, &attr, &error);
 	if (res != DW_DLV_OK) {
 		perror("var has no DW_AT_location");
@@ -268,12 +291,17 @@ bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
 		perror("var has no loclist");
 		return result;
 	}
+
+	/*fbreg's pc range should be : subprog lowPC + (high pc or low pc) - first low pc*/
+	/*To decrease # of calculation, compute (prog_lowPC - first low_oc) and use the result as new "prog low pc"*/
+	low_pc -= (address_t)llbuf[0]->ld_lopc;
+
 	for (j = 0; j < count; j++) {
 
 		unsigned int ents = llbuf[j]->ld_cents;
 		locp = llbuf[j]->ld_s;
-		address_t highpc = (address_t)llbuf[j]->ld_hipc;
-		address_t lowpc = (address_t)llbuf[j]->ld_lopc;
+		address_t highpc = (address_t)llbuf[j]->ld_hipc + low_pc;
+		address_t lowpc = (address_t)llbuf[j]->ld_lopc + low_pc;
 		int p_offset_count = -1;
 		for (entindx = 0; entindx < ents; entindx++) {
 			Dwarf_Loc *llocp;
@@ -318,10 +346,14 @@ bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list){
 				erase_locrecord(highpc, lowpc, loc_list);
 			}
 		}
+		dwarf_dealloc(dbg, llbuf[j]->ld_s, DW_DLA_LOC_BLOCK);
+		dwarf_dealloc(dbg,llbuf[j], DW_DLA_LOCDESC);
 	}
 
-	result = true;
-	return result;
+	//dealloc dwarf_loclist_n()
+	dwarf_dealloc(dbg, llbuf, DW_DLA_LIST);
+
+	return true;
 }
 
 //get size from type Die
@@ -356,7 +388,7 @@ bool get_die_size(Dwarf_Die typeDie, int *ret){
 	return result;
 }
 
-bool get_die_offset(Dwarf_Die typeDie, int *ret){
+bool get_die_offset(Dwarf_Debug dbg, Dwarf_Die typeDie, int *ret){
 	bool result = false;
 	Dwarf_Locdesc *llbuf;
 	Dwarf_Loc *locp;
@@ -391,10 +423,14 @@ bool get_die_offset(Dwarf_Die typeDie, int *ret){
 				break;
 			}
 		}
+
 		if(offset != -1){
 			break;
 		}
 	}
+
+	dwarf_dealloc(dbg, llbuf->ld_s, DW_DLA_LOC_BLOCK);
+	dwarf_dealloc(dbg, llbuf, DW_DLA_LOCDESC);
 
 	if(offset != -1){
 		result = true;
@@ -612,6 +648,10 @@ bool cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 	for(i = 0; i < var->loclist.size(); i++){
 		if(var->loclist.at(i)->loc_type == OFFSET_LOC){
 			offset_loc * loc = (offset_loc *)var->loclist.at(i);
+			/*check PC range*/
+			if(loc->pc_cmp(pc) == false){
+				continue;
+			}
 			if(loc->piece_offset == -1){
 				/*non optimization location*/
 				/*get var type*/
@@ -625,10 +665,7 @@ bool cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 
 			}else{
 				/*optimization location*/
-				/*check PC range*/
-				if(loc->pc_cmp(pc) == false){
-					continue;
-				}
+
 				if(loc->reg_name == regname && offset == loc->offset){
 					result = true;
 					break;

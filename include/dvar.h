@@ -14,6 +14,8 @@ public:
 	bool cmp_loc(Exp *exp, address_t pc);
 	bool cmp_reg(Exp *exp, address_t pc);
 
+	DVAR_TYPE_T original_type();
+
 	/*information that available in variable DIE or DIEs before typeDIE*/
 	string var_name;
 	Dwarf_Off var_type; // the offset of type die of this variable, no matter its base/struc/array/ptr

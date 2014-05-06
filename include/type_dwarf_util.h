@@ -5,15 +5,15 @@
 
 using namespace std;
 dvariable* check_loop_type(dvariable *var, Dwarf_Off type_offset);
-bool get_frame_base(Dwarf_Die die, vector<location *> &loc_list);
+bool get_frame_base(Dwarf_Debug dbg, Dwarf_Die die, vector<location *> &loc_list);
 bool check_artificial(Dwarf_Die die);
 
-bool get_die_name(Dwarf_Die die, string &ret);
+bool get_die_name(Dwarf_Debug dbg, Dwarf_Die die, string &ret);
 bool get_die_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret, Dwarf_Off *ret_off);
-bool get_die_loclist(Dwarf_Die die, vector<location *> &loc_list, vector<location *> &frame_base);
+bool get_die_loclist(Dwarf_Debug dbg, Dwarf_Die die, vector<location *> &loc_list, vector<location *> &frame_base);
 
 bool get_die_size(Dwarf_Die typeDie, int *ret);
-bool get_die_offset(Dwarf_Die typeDie, int *ret);
+bool get_die_offset(Dwarf_Debug dbg, Dwarf_Die typeDie, int *ret);
 bool get_array_size(Dwarf_Die typeDie, int *ret);
 bool get_die_su(Dwarf_Die typeDie, sign_type_t *ret);
 
