@@ -9,9 +9,9 @@ using namespace std;
 
 enum vertex_type_t{
 	VARIABLE,
+	POINTED,
 	REGISTER,
 	OPERATION,
-	POINTED,
 	S_NODE,
 	U_NODE,
 };
@@ -29,7 +29,15 @@ struct vertex_exp_type_t {
   typedef boost::vertex_property_tag kind;
 };
 
-struct identity_in_list_type_t {
+struct id_pos_type_t {
+  typedef boost::vertex_property_tag kind;
+};
+
+struct id_exp_type_t {
+  typedef boost::vertex_property_tag kind;
+};
+
+struct id_index_type_t {
   typedef boost::vertex_property_tag kind;
 };
 
@@ -55,9 +63,11 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
 		boost::property < boost::vertex_predecessor_t, Traits::edge_descriptor,
 		boost::property < signed_unsigend_type_t, sign_type_t,
 		boost::property < vertex_exp_type_t, vertex_type_t,
-		boost::property < identity_in_list_type_t, int,
+		boost::property < id_pos_type_t, int,	//For variable and pointer
+		boost::property < id_exp_type_t, Exp *,	//For op
+		boost::property < id_index_type_t, int, //For reg
 		boost::property < visited_type_t, bool,
-		boost::property < visible_type_t, bool > > > > > > > > > >,
+		boost::property < visible_type_t, bool > > > > > > > > > > > >,
 
 		boost::property < boost::edge_capacity_t, EdgeWeightType,
 		boost::property < boost::edge_residual_capacity_t, EdgeWeightType,
@@ -74,9 +84,11 @@ typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS,
 		boost::property < boost::vertex_predecessor_t, Traits::edge_descriptor,
 		boost::property < signed_unsigend_type_t, sign_type_t,
 		boost::property < vertex_exp_type_t, vertex_type_t,
-		boost::property < identity_in_list_type_t, int,
+		boost::property < id_pos_type_t, int,
+		boost::property < id_exp_type_t, Exp *,
+		boost::property < id_index_type_t, int,
 		boost::property < visited_type_t, bool,
-		boost::property < visible_type_t, bool >  > > > > > > > > > > Undirect_Graph;
+		boost::property < visible_type_t, bool >  > > > > > > > > > > > > Undirect_Graph;
 
 typedef boost::graph_traits<Undirect_Graph>::vertex_descriptor vertex_iter_udi;
 typedef boost::graph_traits<Undirect_Graph>::vertices_size_type vertex_index_udi;
@@ -118,16 +130,17 @@ public:
 
 class Register: public vertex{
 public:
-	Register(Exp *reg_info, Graph::vertex_descriptor descriptor);
-	Exp *reg_info;
+	Register(Exp *exp, Graph::vertex_descriptor descriptor);
+	Exp *exp;
 };
 
 class Operation: public vertex{
 public:
-	Operation(op_type_t op_type, Graph::vertex_descriptor descriptor, int block, int stmt);
+	Operation(op_type_t op_type, Graph::vertex_descriptor descriptor, Exp *exp, int block, int stmt);
 	op_type_t op_type;
 	int block_number;
 	int stmt_number;
+	Exp *exp;
 };
 
 class Bin_Operation: public Operation{
@@ -136,12 +149,11 @@ public:
 	binop_type_t binop_type;
 	Graph::vertex_descriptor operand_l;
 	Graph::vertex_descriptor operand_r;
-	BinOp *exp;
 };
 
 class Un_Operation: public Operation{
 public:
-	Un_Operation(unop_type_t t, Graph::vertex_descriptor op, Graph::vertex_descriptor descriptor, int block, int stmt);
+	Un_Operation(unop_type_t t, Graph::vertex_descriptor op, Graph::vertex_descriptor descriptor, UnOp *exp, int block, int stmt);
 	unop_type_t unop_type;
 	Graph::vertex_descriptor operand;
 };
@@ -184,9 +196,11 @@ struct func_vertex_block{
 	//asm_function_t *func;
 	string func_name;
 	vector<Variable *> variable_list;
-	vector<Register *> reg_list;
-	vector<Operation *> op_list;
 	vector<Pointed *> ptarget_list;
+
+	map<int, Register *> reg_list;
+	map<Exp *, Operation *> op_list;
+
 	pointer_list ptr_list;
 	Graph::vertex_descriptor s_des;
 	Graph::vertex_descriptor u_des;

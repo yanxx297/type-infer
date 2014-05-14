@@ -74,7 +74,9 @@ int s_s, s_u, u_s, u_u, s_un, u_un;
 Graph::vertex_descriptor undi_to_dig(Undirect_Graph::vertex_descriptor src, Undirect_Graph &undig, Graph &dig, func_vertex_ptr func_block){
 	Graph::vertex_descriptor res;
 
-	boost::property_map<Undirect_Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), undig);
+	boost::property_map<Undirect_Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), undig);
+	boost::property_map<Undirect_Graph, id_exp_type_t>::type g_exp = boost::get(id_exp_type_t(), undig);
+	boost::property_map<Undirect_Graph, id_index_type_t>::type g_index = boost::get(id_index_type_t(), undig);
 	boost::property_map<Undirect_Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), undig);
 
 	switch(g_vet[src]){
@@ -83,7 +85,7 @@ Graph::vertex_descriptor undi_to_dig(Undirect_Graph::vertex_descriptor src, Undi
 		break;
 	}
 	case REGISTER:{
-		res = func_block->reg_list.at(g_id[src])->my_descriptor;
+		res = func_block->reg_list.at(g_index[src])->my_descriptor;
 		break;
 	}
 	case POINTED:{
@@ -91,7 +93,7 @@ Graph::vertex_descriptor undi_to_dig(Undirect_Graph::vertex_descriptor src, Undi
 		break;
 	}
 	case OPERATION:{
-		res = func_block->op_list.at(g_id[src])->my_descriptor;
+		res = func_block->op_list.at(g_exp[src])->my_descriptor;
 		break;
 	}
 	case S_NODE:{
@@ -115,8 +117,7 @@ Graph::vertex_descriptor undi_to_dig(Undirect_Graph::vertex_descriptor src, Undi
 void remove_unrelated_nodes(func_vertex_ptr func_block, Undirect_Graph& g, Graph &dig, boost::disjoint_sets<Rank, Parent>& ds){
 	boost::property_map<Graph, visible_type_t>::type g_vi = boost::get(visible_type_t(), dig);
 	boost::property_map<Undirect_Graph, vertex_exp_type_t>::type ug_vet = boost::get(vertex_exp_type_t(), g);
-	boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, dig);
-	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), dig);
+	//boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), dig);
 	pair<vertex_iter, vertex_iter> vp;
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
     	if(ds.find_set(*vp.first) != ds.find_set(func_block->s_des) &&
@@ -124,22 +125,14 @@ void remove_unrelated_nodes(func_vertex_ptr func_block, Undirect_Graph& g, Graph
     		Graph::vertex_descriptor src = undi_to_dig(*vp.first, g, dig, func_block);
     		if(ug_vet[*vp.first] != VARIABLE && ug_vet[*vp.first] != POINTED){
         		g_vi[src] = false;
-        		//printf("remove node %s\n", g_name[src].c_str());
     		}
-//    		else if(ug_vet[*vp.first] == VARIABLE){
-//    			func_block->variable_list.at(g_id[src])->infered_su = UNKNOW_T;
-//    		}else if(ug_vet[*vp.first] == POINTED){
-//    			func_block->ptarget_list.at(g_id[src])->infered_su = UNKNOW_T;
-//    		}
     	}
     }
 }
 
 void set_component_to_unknown(func_vertex_ptr func_block, Undirect_Graph& g, Graph &dig, boost::disjoint_sets<Rank, Parent>& ds){
-	boost::property_map<Graph, visible_type_t>::type g_vi = boost::get(visible_type_t(), dig);
 	boost::property_map<Undirect_Graph, vertex_exp_type_t>::type ug_vet = boost::get(vertex_exp_type_t(), g);
-	boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, dig);
-	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), dig);
+	boost::property_map<Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), dig);
 	pair<vertex_iter, vertex_iter> vp;
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
     	if(ds.find_set(*vp.first) != ds.find_set(func_block->s_des) &&
@@ -160,7 +153,7 @@ void set_component_to_unknown(func_vertex_ptr func_block, Undirect_Graph& g, Gra
 void set_componet_to_signed(func_vertex_ptr func_block, Undirect_Graph& g, Graph &dig, boost::disjoint_sets<Rank, Parent>& ds){
 	boost::property_map<Graph, signed_unsigend_type_t>::type g_su = boost::get(signed_unsigend_type_t(), dig);
 	boost::property_map<Undirect_Graph, vertex_exp_type_t>::type ug_vet = boost::get(vertex_exp_type_t(), g);
-	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), dig);
+	boost::property_map<Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), dig);
 	pair<vertex_iter, vertex_iter> vp;
     for (vp = vertices(g); vp.first != vp.second; ++vp.first){
     	if(ds.find_set(*vp.first) == ds.find_set(func_block->s_des)){
@@ -361,13 +354,14 @@ void print_type_infer_result(func_vertex_ptr func_block, const char *progname){
 
 void draw_var_graph(func_vertex_ptr func_block, Graph& g){
 	FILE *fp;
-	int i;
+	//int i;
 
 	boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
 	boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
-	boost::property_map<Graph, boost::vertex_color_t>::type g_color = boost::get(boost::vertex_color, g);
+	//boost::property_map<Graph, boost::vertex_color_t>::type g_color = boost::get(boost::vertex_color, g);
 	boost::property_map<Graph, signed_unsigend_type_t>::type g_sut = boost::get(signed_unsigend_type_t(), g);
-	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
+	boost::property_map<Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), g);
+	boost::property_map<Graph, id_exp_type_t>::type g_exp = boost::get(id_exp_type_t(), g);
 	boost::property_map<Graph, visible_type_t>::type g_vi = boost::get(visible_type_t(), g);
 
 
@@ -445,7 +439,7 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 	}
 	switch(var->var_struct_type){
 	case DVAR_BASE:{
-		boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
+		boost::property_map<Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), g);
 		boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
 		boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
 		dbase *base = (dbase *)var;
@@ -510,7 +504,7 @@ void push_each_pointer(dvariable *var, func_vertex_ptr &func_list, Graph& g){
 void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g){
 	switch(var->var_struct_type){
 	case DVAR_BASE:{
-		boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
+		boost::property_map<Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), g);
 		boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
 		boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
 
@@ -561,15 +555,7 @@ void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g){
 		dptr * ptr = (dptr *)var;
 		if(ptr->var != 0){
 			push_each_pointer(ptr,func_list,g);
-//			if(ptr->leaf != YES){
-//				push_each_var(ptr->var, func_list, g);
-//			}
 		}
-//		if(ptr->var != 0 && ptr->leaf != YES){
-//			push_each_var(ptr->var, func_list, g);
-//		}else if(ptr->var != 0 && ptr->leaf == YES){
-//			push_each_pointer(ptr,func_list,g);
-//		}
 		break;
 	}
 	default:{
@@ -899,12 +885,14 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 		look_for_binop_by_des(func_list[i], func_list[i]->variable_list.at(1)->my_descriptor, XOR, graph_list.at(i));
 #endif
 
-		//id_to_vineir(func_list, g);
+
 
 	} else {
 		//Coloring every node in signed component to red(signed)
 		set_componet_to_signed(func_list, new_graph, g, ds);
 	}
+
+	id_to_vineir(func_list, g);
 
 
 //	Apply debug tools
@@ -928,6 +916,7 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 			"***********************infer result*******************************\n");
 	printf("%s:\n", func_list->func_name.c_str());
 	print_type_infer_result(func_list, prog->abfd->filename);
+	print_reg(func_list);
 
 	/*Deallocate memory*/
 	delete func_list;

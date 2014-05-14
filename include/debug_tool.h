@@ -7,3 +7,4 @@ void look_for_binop_by_des(func_vertex_ptr func_block, Graph::vertex_descriptor 
 void id_to_vineir(func_vertex_ptr func_block, Graph &g);
 
 void print_ptargetlist(vector<Pointed *> &list);
+void print_reg(func_vertex_ptr func_block);

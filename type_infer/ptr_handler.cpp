@@ -152,7 +152,8 @@ int check_ptr(dvariable * ptr, vector<Pointed *> &ptarget_list){
 //look for the most recent mem[] = reg
 //return reg's descriptor
 int copy_from_reg_lookup(func_vertex_ptr func_block, int block, int stmt, Mem *exp){
-	int result = -1;
+	bool result = false;
+	int ret = -1;
 	int i, j;
 
 	for(i = block; i > 0; i--){
@@ -174,10 +175,9 @@ int copy_from_reg_lookup(func_vertex_ptr func_block, int block, int stmt, Mem *e
 					bool mem_cmp = compare_mem(exp, (Mem *)equal->lhs);
 					if(mem_cmp == true){
 						result = search_reg(func_block, (Tmp_s *)equal->rhs);
-						if(result != -1){
-							result = func_block->reg_list.at(result)->my_descriptor;
-							//printf("\tFind %s\n",((Tmp_s *)equal->rhs)->tostring().c_str());
-							return result;
+						if(result == true){
+							ret = func_block->reg_list.at(((Tmp_s *)equal->rhs)->index)->my_descriptor;
+							return ret;
 						}
 					}
 
@@ -187,7 +187,7 @@ int copy_from_reg_lookup(func_vertex_ptr func_block, int block, int stmt, Mem *e
 		}
 	}
 
-	return result;
+	return ret;
 }
 
 void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){

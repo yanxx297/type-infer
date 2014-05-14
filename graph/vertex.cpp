@@ -39,9 +39,7 @@ vertex::vertex(vertex_type_t vertex_type, Graph::vertex_descriptor descriptor)
 
 Variable::Variable(dbase *debug_info, Graph::vertex_descriptor descriptor, string name)
 :vertex(VARIABLE,descriptor),debug_info(debug_info), var_name(name), infered_su(UNSIGNED_T)
-{
-	//cout<<this->var_name<<"'s copy list size:"<<this->field_copy_list.size()<<endl;
-	}
+{}
 
 Variable::~Variable(){
 	this->field_copy_list.clear();
@@ -50,9 +48,6 @@ Variable::~Variable(){
 Pointed::Pointed(dbase *debug_info, Graph::vertex_descriptor descriptor, string name)
 :vertex(POINTED,descriptor), ptr_name(name), infered_su(UNSIGNED_T)
 {
-	//this->debug_info_list.push_back(debug_info);
-	//this->id_oddset = debug_info->pointed_info.offset;
-	//this->struct_offset = debug_info->pointed_info.offset_strucr;
 	this->Add_into_list(debug_info);
 }
 
@@ -79,8 +74,8 @@ bool Pointed::cmp_ptr_type(dvariable * ptr){
 		/*If yes, then not treated as the same type*/
 		dvariable *myparent = this->debug_info_list.at(0)->parent;
 		dvariable *parent = ptr->parent;
-		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == NO){
-			result = YES;
+		if(myparent != 0 && parent != 0 && parent->cmp_type(myparent) == false){
+			result = true;
 		}
 		result = true;
 	}
@@ -94,13 +89,6 @@ bool Pointed::cmp_pointed(Pointed *ptr){
 	if(ptr->debug_info_list.at(0)->var_length != this->debug_info_list.at(0)->var_length){
 		return false;
 	}
-
-	/*Map by name*/
-//	if(ptr->ptr_name == this->ptr_name){
-//		return true;
-//	}else if(ptr->debug_info_list.at(0)->var_name == this->debug_info_list.at(0)->var_name){
-//		return true;
-//	}
 
 	/*map by offset in a specific structure*/
 	if(ptr->debug_info_list.at(0)->parent->parent != 0 &&
@@ -120,20 +108,20 @@ bool Pointed::cmp_pointed(Pointed *ptr){
 	return false;
 }
 
-Register::Register(Exp *reg_info,Graph::vertex_descriptor descriptor)
-:vertex(REGISTER,descriptor),reg_info(reg_info)
+Register::Register(Exp *exp, Graph::vertex_descriptor descriptor)
+:vertex(REGISTER,descriptor),exp(exp)
 {}
 
-Operation::Operation(op_type_t op_type, Graph::vertex_descriptor descriptor, int block, int stmt)
-:vertex(OPERATION,descriptor),op_type(op_type), block_number(block), stmt_number(stmt)
+Operation::Operation(op_type_t op_type, Graph::vertex_descriptor descriptor, Exp *exp, int block, int stmt)
+:vertex(OPERATION,descriptor),op_type(op_type), block_number(block), stmt_number(stmt), exp(exp)
 {};
 
 Bin_Operation::Bin_Operation(binop_type_t t,Graph::vertex_descriptor l, Graph::vertex_descriptor r, Graph::vertex_descriptor descriptor, BinOp *exp, int block, int stmt)
-:Operation(BIN_OP, descriptor, block, stmt), binop_type(t), operand_l(l), operand_r(r), exp(exp)
+:Operation(BIN_OP, descriptor, exp, block, stmt), binop_type(t), operand_l(l), operand_r(r)
 {};
 
-Un_Operation::Un_Operation(unop_type_t t, Graph::vertex_descriptor op, Graph::vertex_descriptor descriptor, int block, int stmt)
-:Operation(UN_OP, descriptor, block, stmt), unop_type(t), operand(op)
+Un_Operation::Un_Operation(unop_type_t t, Graph::vertex_descriptor op, Graph::vertex_descriptor descriptor, UnOp *exp, int block, int stmt)
+:Operation(UN_OP, descriptor, exp, block, stmt), unop_type(t), operand(op)
 {};
 
 //----------------------------------------------------------------------------------------------------------------X
@@ -236,14 +224,14 @@ func_vertex_block::~func_vertex_block(){
 	this->variable_list.clear();
 
 	/*clean reg list*/
-	for(i = 0; i < this->reg_list.size(); i++){
-		delete this->reg_list.at(i);
+	for(map<int, Register *>::iterator it = this->reg_list.begin(); it != this->reg_list.end(); ++it){
+		delete it->second;
 	}
 	this->reg_list.clear();
 
 	/*clean op list*/
-	for(i = 0; i < this->op_list.size(); i++){
-		delete this->op_list.at(i);
+	for(map<Exp *, Operation *>::iterator it = this->op_list.begin(); it != this->op_list.end(); ++it){
+		delete it->second;
 	}
 	this->op_list.clear();
 

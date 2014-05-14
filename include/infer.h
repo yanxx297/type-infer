@@ -14,15 +14,14 @@ Traits::edge_descriptor add_edge_with_cap(Traits::vertex_descriptor &v1,
                                 Graph &g);
 Graph::vertex_descriptor add_default_vertex(Graph &g, sign_type_t su_type);
 void print_variable_list(func_vertex_ptr *func_list, int len);
-int check_duplicate_operation(func_vertex_ptr func_block, Operation *op);
+bool check_duplicate_operation(func_vertex_ptr func_block, Operation *op);
 int search_by_func_name(func_vertex_ptr func_block, fblock_ptr *vine_ir_block);
 bool is_var(func_vertex_ptr func_block, Graph::vertex_descriptor v_des);
 int var_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt);
 bool is_flag(Tmp_s *reg_tmp);
-int push_register(func_vertex_ptr func_block, Tmp_s *reg_tmp, Graph& g);
-int search_reg(func_vertex_ptr func_list, Tmp_s *target);
+bool push_register(func_vertex_ptr func_block, Tmp_s *reg_tmp, Graph& g);
+bool search_reg(func_vertex_ptr func_list, Tmp_s *target);
 int search_var(func_vertex_ptr func_list, int block, int stmt, Mem *target);
-int search_op(func_vertex_ptr func_list, int block, int stmt, Exp *target);
 Graph::vertex_descriptor node_searcher(func_vertex_ptr func_list, int block, int stmt, Exp *target);
 bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *block, int *stmt, Tmp_s *target, Exp *&res);
 bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g);

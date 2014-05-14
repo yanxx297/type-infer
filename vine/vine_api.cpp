@@ -7,8 +7,7 @@
 #include "asm_program.h"
 #include "disasm-pp.h"
 
-extern "C"
-{
+extern "C" {
 #include "libvex.h"
 }
 
@@ -22,20 +21,18 @@ extern "C"
 #include "interproc.h"
 #include "vine_api.h"
 
-
-
 using namespace std;
 
 int cfg_funclist_length;
 struct addr_range* vine_text;
 
-basic_block::~basic_block(){
+basic_block::~basic_block() {
 	free(this->block);
 }
 
-func_block::~func_block(){
+func_block::~func_block() {
 	int i;
-	for(i = 0; i < this->len; i++){
+	for (i = 0; i < this->len; i++) {
 		delete this->block_list[i];
 	}
 	free(this->block_list);
@@ -48,110 +45,53 @@ fblock_ptr tranform_to_tmp_free(fblock_ptr func_blocks, int func_num) {
 			switch (func_blocks->block_list[j]->block[k]->stmt_type) {
 			case MOVE: {
 				//Left
-				if (((Move *) func_blocks->block_list[j]->block[k])->lhs->exp_type
-						== TEMP
-						&& check_tmp(
-								(Temp *) ((Move *) func_blocks->block_list[j]->block[k])->lhs)
-								== YES) {
+				if (((Move *) func_blocks->block_list[j]->block[k])->lhs->exp_type == TEMP && check_tmp((Temp *) ((Move *) func_blocks->block_list[j]->block[k])->lhs) == YES) {
 					//Do nothing, since this situation is "Temp = Exp" form.
 				} else {
-					visit_tmp(
-							(Exp *) func_blocks->block_list[j]->block[k],
-							((Move *) func_blocks->block_list[j]->block[k])->lhs,
-							M_L, j, k, func_blocks);
+					visit_tmp((Exp *) func_blocks->block_list[j]->block[k], ((Move *) func_blocks->block_list[j]->block[k])->lhs, M_L, j, k, func_blocks);
 				}
 
 				//Right
-				if (((Move *) func_blocks->block_list[j]->block[k])->rhs->exp_type
-						== TEMP
-						&& check_tmp(
-								(Temp *) ((Move *) func_blocks->block_list[j]->block[k])->rhs)
-								== YES) {
-					Exp *tmp =
-							query_value(func_blocks, j, k - 1,
-									(Temp *) ((Move *) func_blocks->block_list[j]->block[k])->rhs);
-					((Move *) func_blocks->block_list[j]->block[k])->rhs =
-							tmp;
+				if (((Move *) func_blocks->block_list[j]->block[k])->rhs->exp_type == TEMP && check_tmp((Temp *) ((Move *) func_blocks->block_list[j]->block[k])->rhs) == YES) {
+					Exp *tmp = query_value(func_blocks, j, k - 1, (Temp *) ((Move *) func_blocks->block_list[j]->block[k])->rhs);
+					((Move *) func_blocks->block_list[j]->block[k])->rhs = tmp;
 				} else {
-					visit_tmp(
-							(Exp *) func_blocks->block_list[j]->block[k],
-							((Move *) func_blocks->block_list[j]->block[k])->rhs,
-							M_R, j, k, func_blocks);
+					visit_tmp((Exp *) func_blocks->block_list[j]->block[k], ((Move *) func_blocks->block_list[j]->block[k])->rhs, M_R, j, k, func_blocks);
 				}
 
 				break;
 			}
 			case JMP: {
 
-				if (((Jmp *) func_blocks->block_list[j]->block[k])->target->exp_type
-						== TEMP
-						&& check_tmp(
-								(Temp *) ((Jmp *) func_blocks->block_list[j]->block[k])->target)
-								== YES) {
-					Exp *tmp =
-							query_value(func_blocks, j, k - 1,
-									(Temp *) ((Jmp *) func_blocks->block_list[j]->block[k])->target);
-					((Jmp *) func_blocks->block_list[j]->block[k])->target =
-							tmp;
+				if (((Jmp *) func_blocks->block_list[j]->block[k])->target->exp_type == TEMP && check_tmp((Temp *) ((Jmp *) func_blocks->block_list[j]->block[k])->target) == YES) {
+					Exp *tmp = query_value(func_blocks, j, k - 1, (Temp *) ((Jmp *) func_blocks->block_list[j]->block[k])->target);
+					((Jmp *) func_blocks->block_list[j]->block[k])->target = tmp;
 				} else {
-					visit_tmp(
-							(Exp *) func_blocks->block_list[j]->block[k],
-							((Jmp *) func_blocks->block_list[j]->block[k])->target,
-							T_EXP, j, k, func_blocks);
+					visit_tmp((Exp *) func_blocks->block_list[j]->block[k], ((Jmp *) func_blocks->block_list[j]->block[k])->target, T_EXP, j, k, func_blocks);
 				}
 
 				break;
 			}
 			case CJMP: {
-				if (((CJmp *) func_blocks->block_list[j]->block[k])->t_target->exp_type
-						== TEMP
-						&& check_tmp(
-								(Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->t_target)
-								== YES) {
-					Exp *tmp =
-							query_value(func_blocks, j, k - 1,
-									(Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->t_target);
-					((CJmp *) func_blocks->block_list[j]->block[k])->t_target =
-							tmp;
+				if (((CJmp *) func_blocks->block_list[j]->block[k])->t_target->exp_type == TEMP && check_tmp((Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->t_target) == YES) {
+					Exp *tmp = query_value(func_blocks, j, k - 1, (Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->t_target);
+					((CJmp *) func_blocks->block_list[j]->block[k])->t_target = tmp;
 				} else {
-					visit_tmp(
-							(Exp *) func_blocks->block_list[j]->block[k],
-							((CJmp *) func_blocks->block_list[j]->block[k])->t_target,
-							T_T, j, k, func_blocks);
+					visit_tmp((Exp *) func_blocks->block_list[j]->block[k], ((CJmp *) func_blocks->block_list[j]->block[k])->t_target, T_T, j, k, func_blocks);
 				}
 
-				if (((CJmp *) func_blocks->block_list[j]->block[k])->f_target->exp_type
-						== TEMP
-						&& check_tmp(
-								(Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->f_target)
-								== YES) {
-					Exp *tmp =
-							query_value(func_blocks, j, k - 1,
-									(Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->f_target);
-					((CJmp *) func_blocks->block_list[j]->block[k])->f_target =
-							tmp;
+				if (((CJmp *) func_blocks->block_list[j]->block[k])->f_target->exp_type == TEMP && check_tmp((Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->f_target) == YES) {
+					Exp *tmp = query_value(func_blocks, j, k - 1, (Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->f_target);
+					((CJmp *) func_blocks->block_list[j]->block[k])->f_target = tmp;
 				} else {
-					visit_tmp(
-							(Exp *) func_blocks->block_list[j]->block[k],
-							((CJmp *) func_blocks->block_list[j]->block[k])->f_target,
-							T_F, j, k, func_blocks);
+					visit_tmp((Exp *) func_blocks->block_list[j]->block[k], ((CJmp *) func_blocks->block_list[j]->block[k])->f_target, T_F, j, k, func_blocks);
 				}
 
-				if (((CJmp *) func_blocks->block_list[j]->block[k])->cond->exp_type
-						== TEMP
-						&& check_tmp(
-								(Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->cond)
-								== YES) {
-					Exp *tmp =
-							query_value(func_blocks, j, k - 1,
-									(Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->cond);
-					((CJmp *) func_blocks->block_list[j]->block[k])->cond =
-							tmp;
+				if (((CJmp *) func_blocks->block_list[j]->block[k])->cond->exp_type == TEMP && check_tmp((Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->cond) == YES) {
+					Exp *tmp = query_value(func_blocks, j, k - 1, (Temp *) ((CJmp *) func_blocks->block_list[j]->block[k])->cond);
+					((CJmp *) func_blocks->block_list[j]->block[k])->cond = tmp;
 				} else {
-					visit_tmp(
-							(Exp *) func_blocks->block_list[j]->block[k],
-							((CJmp *) func_blocks->block_list[j]->block[k])->cond,
-							T_C, j, k, func_blocks);
+					visit_tmp((Exp *) func_blocks->block_list[j]->block[k], ((CJmp *) func_blocks->block_list[j]->block[k])->cond, T_C, j, k, func_blocks);
 				}
 
 				break;
@@ -168,8 +108,7 @@ fblock_ptr tranform_to_tmp_free(fblock_ptr func_blocks, int func_num) {
 
 //Get the value of a certain temp variable
 //value = an expression of register and constants
-Exp *query_value(fblock_ptr func_block, int block_num, int stmt_num,
-		Temp* t_name) {
+Exp *query_value(fblock_ptr func_block, int block_num, int stmt_num, Temp* t_name) {
 //	find the latest definition (Move) of <t_name>
 	int i;
 	Exp *result;
@@ -177,8 +116,7 @@ Exp *query_value(fblock_ptr func_block, int block_num, int stmt_num,
 	if (stmt_num >= func_block->block_list[block_num]->blen) {
 		print_error("Current position out of range");
 		printf("Look for <%s>\n", t_name->name.c_str());
-		printf("In function <%s> BBlock[%d]:\n", func_block->func->name.c_str(),
-				block_num);
+		printf("In function <%s> BBlock[%d]:\n", func_block->func->name.c_str(), block_num);
 		printf("Current position = %d\n", stmt_num);
 		printf("Range:%d\n", func_block->block_list[block_num]->blen);
 		exit(1);
@@ -189,12 +127,9 @@ Exp *query_value(fblock_ptr func_block, int block_num, int stmt_num,
 			break;
 		}
 		if (func_block->block_list[block_num]->block[i]->stmt_type == MOVE) {
-			if (((Move *) func_block->block_list[block_num]->block[i])->lhs->exp_type
-					== TEMP) {
-				if (((Temp *) ((Move *) func_block->block_list[block_num]->block[i])->lhs)->name
-						== t_name->name) {
-					result =
-							(Temp *) ((Move *) func_block->block_list[block_num]->block[i])->rhs;
+			if (((Move *) func_block->block_list[block_num]->block[i])->lhs->exp_type == TEMP) {
+				if (((Temp *) ((Move *) func_block->block_list[block_num]->block[i])->lhs)->name == t_name->name) {
+					result = (Temp *) ((Move *) func_block->block_list[block_num]->block[i])->rhs;
 					flag = YES;
 					break;
 				}
@@ -203,29 +138,22 @@ Exp *query_value(fblock_ptr func_block, int block_num, int stmt_num,
 	}
 
 	if (flag == NO && block_num - 1 >= 0) {
-		result = query_value(func_block, block_num - 1,
-				(func_block->block_list[block_num - 1]->blen) - 1, t_name);
+		result = query_value(func_block, block_num - 1, (func_block->block_list[block_num - 1]->blen) - 1, t_name);
 	}
 
 	return result;
 }
 
-void visit_tmp(Exp *parent, Exp *exp, EXP_OPT opt, int block_num, int curr_pos,
-		fblock_ptr func_block) {
+void visit_tmp(Exp *parent, Exp *exp, EXP_OPT opt, int block_num, int curr_pos, fblock_ptr func_block) {
 	if (exp->exp_type == BINOP) {
-		visit_tmp(exp, ((BinOp *) exp)->lhs, LEXP, block_num, curr_pos,
-				func_block);
-		visit_tmp(exp, ((BinOp *) exp)->rhs, REXP, block_num, curr_pos,
-				func_block);
+		visit_tmp(exp, ((BinOp *) exp)->lhs, LEXP, block_num, curr_pos, func_block);
+		visit_tmp(exp, ((BinOp *) exp)->rhs, REXP, block_num, curr_pos, func_block);
 	} else if (exp->exp_type == UNOP) {
-		visit_tmp(exp, ((UnOp *) exp)->exp, EXP, block_num, curr_pos,
-				func_block);
+		visit_tmp(exp, ((UnOp *) exp)->exp, EXP, block_num, curr_pos, func_block);
 	} else if (exp->exp_type == CAST) {
-		visit_tmp(exp, ((Cast *) exp)->exp, CAST_EXP, block_num, curr_pos,
-				func_block);
+		visit_tmp(exp, ((Cast *) exp)->exp, CAST_EXP, block_num, curr_pos, func_block);
 	} else if (exp->exp_type == MEM) {
-		visit_tmp(exp, ((Mem *) exp)->addr, ADDR, block_num, curr_pos,
-				func_block);
+		visit_tmp(exp, ((Mem *) exp)->addr, ADDR, block_num, curr_pos, func_block);
 	} else if (exp->exp_type == TEMP && check_tmp((Temp *) exp) == YES) {
 		if (parent == NULL) {
 			print_error("No parent for a Temp");
@@ -234,8 +162,7 @@ void visit_tmp(Exp *parent, Exp *exp, EXP_OPT opt, int block_num, int curr_pos,
 			print_error("No option for a Temp");
 			exit(1);
 		}
-		Exp *tmp = query_value(func_block, block_num, curr_pos - 1,
-				(Temp *) exp);
+		Exp *tmp = query_value(func_block, block_num, curr_pos - 1, (Temp *) exp);
 		switch (opt) {
 		case LEXP: {
 			((BinOp *) parent)->lhs = tmp;
@@ -323,8 +250,8 @@ BOOL trans_to_vineir(char *filename, vector<vine_block_t *> &vine_blocks, asm_pr
 fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * prog, int func_num, struct addr_range *text) {
 
 	vine_text = new struct addr_range();
-	vine_text->high_addr= text->high_addr;
-	vine_text->low_addr= text->low_addr;
+	vine_text->high_addr = text->high_addr;
+	vine_text->low_addr = text->low_addr;
 
 	int i, j, k;
 	int cfg_funclist_length;
@@ -335,7 +262,7 @@ fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * 
 	function_list->len = 0;
 	function_list->block_list = NULL;
 
-	if(vine_blocks.at(func_num)->vine_ir->size() == 0){
+	if (vine_blocks.at(func_num)->vine_ir->size() == 0) {
 		return function_list;
 	}
 
@@ -352,21 +279,17 @@ fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * 
 	}
 	function_list->func = itr->second;
 
-
-
 	//    Move to new structure (Basic block)
 	//
 	cfg_funclist_length = prog->functions.size();
 	if (func_num < cfg_funclist_length - 1) {
 		itr++;
-		to_basic_block(vine_blocks, function_list,
-				itr->second->start_addr);
+		to_basic_block(vine_blocks, function_list, itr->second->start_addr);
 	} else if (func_num == cfg_funclist_length - 1) {
-		to_basic_block(vine_blocks, function_list,
-				vine_blocks.at(vine_blocks.size() - 1)->inst->address);
+		to_basic_block(vine_blocks, function_list, vine_blocks.at(vine_blocks.size() - 1)->inst->address);
 	}
 
-	if(function_list->len == 0){
+	if (function_list->len == 0) {
 		return function_list;
 	}
 
@@ -398,13 +321,11 @@ fblock_ptr transform_to_ssa(vector<vine_block_t *> vine_blocks, asm_program_t * 
 //		}
 //	}
 
-
 	//	Construct control flow graph
 	//
 	cerr << "Construct control flow graph" << endl;
 	build_cfg(function_list);
 	prune_cfg(function_list);
-
 
 	cerr << "Construct Phi nodes" << endl;
 	printf("Number of funcions: %d\n", cfg_funclist_length);
@@ -440,7 +361,7 @@ void add_edge_jmp(fblock_ptr func_block, Exp *target, int id) {
 			/*dynamic functin call*/
 			/*point to next stmt*/
 			//func_block->block_list[id]->child_next = block_count - 1;
-			func_block->block_list[id]->child_next = id+1;
+			func_block->block_list[id]->child_next = id + 1;
 		}
 	} else if (target->exp_type == TEMP) {
 		/*Point to BB_indrect*/
@@ -462,10 +383,10 @@ void add_edge_cjmp(fblock_ptr func_block, Exp *target, int id, TARGET opt) {
 
 		} else {
 			if (opt == C_F) {
-				func_block->block_list[id]->child_next = id+1;
+				func_block->block_list[id]->child_next = id + 1;
 			} else if (opt == C_T) {
-				func_block->block_list[id]->child_jmp = id+1;
-						//block_count - 1;
+				func_block->block_list[id]->child_jmp = id + 1;
+				//block_count - 1;
 			}
 		}
 	} else if (target->exp_type == TEMP) {
@@ -487,8 +408,7 @@ int search_lable(fblock_ptr func_block, string lable) {
 		if (func_block->block_list[i]->type == BLOCK) {
 			for (j = 0; j < func_block->block_list[i]->blen; j++) {
 				if ((func_block->block_list[i]->block[j])->stmt_type == LABEL) {
-					if (((Label *) func_block->block_list[i]->block[j])->label
-							== lable) {
+					if (((Label *) func_block->block_list[i]->block[j])->label == lable) {
 						result = i;
 					}
 				}
@@ -533,23 +453,17 @@ void print_edges(fblock_ptr func_block) {
 		case BIN: {
 			cout << print_nodename(func_block->block_list, i);
 			cout << " -> ";
-			cout
-					<< print_nodename(func_block->block_list,
-							func_block->block_list[i]->child_jmp) << endl;
+			cout << print_nodename(func_block->block_list, func_block->block_list[i]->child_jmp) << endl;
 
 			cout << print_nodename(func_block->block_list, i);
 			cout << " -> ";
-			cout
-					<< print_nodename(func_block->block_list,
-							func_block->block_list[i]->child_next) << endl;
+			cout << print_nodename(func_block->block_list, func_block->block_list[i]->child_next) << endl;
 			break;
 		}
 		case UN: {
 			cout << print_nodename(func_block->block_list, i);
 			cout << " -> ";
-			cout
-					<< print_nodename(func_block->block_list,
-							func_block->block_list[i]->child_next) << endl;
+			cout << print_nodename(func_block->block_list, func_block->block_list[i]->child_next) << endl;
 			break;
 		}
 		case UNKNOW: {
@@ -665,10 +579,7 @@ int count_block(vector<vine_block_t *> vine_blocks, int begin, int end) {
 	int i, j;
 	for (i = begin; i <= end; i++) {
 		for (j = 0; j < vine_blocks.at(i)->vine_ir->size(); j++) {
-			if (vine_blocks.at(i)->vine_ir->at(j)->stmt_type == JMP
-					|| vine_blocks.at(i)->vine_ir->at(j)->stmt_type == CJMP
-					|| vine_blocks.at(i)->vine_ir->at(j)->stmt_type
-							== SPECIAL) {
+			if (vine_blocks.at(i)->vine_ir->at(j)->stmt_type == JMP || vine_blocks.at(i)->vine_ir->at(j)->stmt_type == CJMP || vine_blocks.at(i)->vine_ir->at(j)->stmt_type == SPECIAL) {
 				if (j == vine_blocks.at(i)->vine_ir->size() - 1 && i == end) {
 					/*last stms, don't divide.*/
 				} else {
@@ -678,8 +589,7 @@ int count_block(vector<vine_block_t *> vine_blocks, int begin, int end) {
 
 			} else if (j + 1 < vine_blocks.at(i)->vine_ir->size()) {
 				if (vine_blocks.at(i)->vine_ir->at(j + 1)->stmt_type == LABEL) {
-					if (((Label *) vine_blocks.at(i)->vine_ir->at(j + 1))->label.compare(
-							0, 2, "L_") == 0) {
+					if (((Label *) vine_blocks.at(i)->vine_ir->at(j + 1))->label.compare(0, 2, "L_") == 0) {
 						//printf("\tdivide at %s\n",vine_blocks.at(i)->vine_ir->at(j+1)->tostring().c_str());
 						result++;
 					}
@@ -695,17 +605,12 @@ int get_blen(vector<vine_block_t *> vine_blocks, int i, int j, int end) {
 	int count = 0;
 	int block, st;
 	for (block = i; block < vine_blocks.size() && block <= end; block++) {
-		for (st = (block == i ? j : 0);
-				st < vine_blocks.at(block)->vine_ir->size(); st++) {
+		for (st = (block == i ? j : 0); st < vine_blocks.at(block)->vine_ir->size(); st++) {
 			count++;
-			if (vine_blocks.at(block)->vine_ir->at(st)->stmt_type == JMP
-					|| vine_blocks.at(block)->vine_ir->at(st)->stmt_type == CJMP
-					|| vine_blocks.at(block)->vine_ir->at(st)->stmt_type
-							== SPECIAL) {
+			if (vine_blocks.at(block)->vine_ir->at(st)->stmt_type == JMP || vine_blocks.at(block)->vine_ir->at(st)->stmt_type == CJMP || vine_blocks.at(block)->vine_ir->at(st)->stmt_type == SPECIAL) {
 				return count;
 			} else if (st + 1 < vine_blocks.at(block)->vine_ir->size()) {
-				if (((Label *) vine_blocks.at(block)->vine_ir->at(st + 1))->label.compare(
-						0, 2, "L_") == 0) {
+				if (((Label *) vine_blocks.at(block)->vine_ir->at(st + 1))->label.compare(0, 2, "L_") == 0) {
 					return count;
 				}
 			}
@@ -714,8 +619,7 @@ int get_blen(vector<vine_block_t *> vine_blocks, int i, int j, int end) {
 	return count;
 }
 
-asm_function_t * get_func_name(asm_program_t *prog,
-		vector<vine_block_t *> vine_blocks, int id) {
+asm_function_t * get_func_name(asm_program_t *prog, vector<vine_block_t *> vine_blocks, int id) {
 	asm_function_t * result = NULL;
 	address_t i = vine_blocks.at(id)->inst->address;
 	result = prog->functions.find(i)->second;
@@ -726,68 +630,44 @@ asm_function_t * get_func_name(asm_program_t *prog,
 void renew_tmp(fblock_ptr func_block) {
 	int i, j;
 	for (i = 0; i < func_block->len; i++) {
-		for(j = 0; j < func_block->block_list[i]->blen; j++){
+		for (j = 0; j < func_block->block_list[i]->blen; j++) {
 			switch (func_block->block_list[i]->block[j]->stmt_type) {
 			case MOVE: {
-				if (((Move *) func_block->block_list[i]->block[j])->lhs->exp_type == TEMP
-						&& get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name) != -1) {
+				if (((Move *) func_block->block_list[i]->block[j])->lhs->exp_type == TEMP && get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name) != -1) {
 					Tmp_s *tmp = new Tmp_s(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs), -1);
 					(((Move *) func_block->block_list[i]->block[j]))->lhs = tmp;
 				} else {
-					switch_to_tmps((Exp *) func_block->block_list[i]->block[j],
-							((Move *) func_block->block_list[i]->block[j])->lhs, M_L);
+					switch_to_tmps((Exp *) func_block->block_list[i]->block[j], ((Move *) func_block->block_list[i]->block[j])->lhs, M_L);
 				}
-				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type == TEMP
-						&& get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs)->name) != -1) {
-					Tmp_s *tmp =new Tmp_s(((Temp *) ((Move *)func_block->block_list[i]->block[j])->rhs), -1);
+				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type == TEMP && get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs)->name) != -1) {
+					Tmp_s *tmp = new Tmp_s(((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs), -1);
 					(((Move *) func_block->block_list[i]->block[j]))->rhs = tmp;
 				} else {
-					switch_to_tmps((Exp *) func_block->block_list[i]->block[j],((Move *) func_block->block_list[i]->block[j])->rhs, M_R);
+					switch_to_tmps((Exp *) func_block->block_list[i]->block[j], ((Move *) func_block->block_list[i]->block[j])->rhs, M_R);
 				}
 				break;
 			}
 			case JMP: {
-				if (((Jmp *) func_block->block_list[i]->block[j])->target->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target)->name)
-								!= -1) {
-					Tmp_s *tmp =
-							new Tmp_s(
-									((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target), -1);
+				if (((Jmp *) func_block->block_list[i]->block[j])->target->exp_type == TEMP && get_reg_position(((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target)->name) != -1) {
+					Tmp_s *tmp = new Tmp_s(((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target), -1);
 					(((Jmp *) func_block->block_list[i]->block[j]))->target = tmp;
 				} else {
-					switch_to_tmps((Exp *) func_block->block_list[i]->block[j],
-							((Jmp *) func_block->block_list[i]->block[j])->target,
-							T_EXP);
+					switch_to_tmps((Exp *) func_block->block_list[i]->block[j], ((Jmp *) func_block->block_list[i]->block[j])->target, T_EXP);
 				}
 				break;
 			}
 			case CJMP: {
-				if (((CJmp *) func_block->block_list[i]->block[j])->t_target->exp_type == TEMP
-						&& get_reg_position(
-								((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target)->name) != -1) {
-					Tmp_s *tmp =
-							new Tmp_s(
-									((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target), -1);
+				if (((CJmp *) func_block->block_list[i]->block[j])->t_target->exp_type == TEMP && get_reg_position(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target)->name) != -1) {
+					Tmp_s *tmp = new Tmp_s(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target), -1);
 					(((CJmp *) func_block->block_list[i]->block[j]))->t_target = tmp;
 				} else {
-					switch_to_tmps((Exp *) func_block->block_list[i]->block[j],
-							((CJmp *) func_block->block_list[i]->block[j])->t_target,
-							T_T);
+					switch_to_tmps((Exp *) func_block->block_list[i]->block[j], ((CJmp *) func_block->block_list[i]->block[j])->t_target, T_T);
 				}
-				if (((CJmp *) func_block->block_list[i]->block[j])->f_target->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target)->name) != -1) {
-					Tmp_s *tmp =
-							new Tmp_s(
-									((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target), -1);
+				if (((CJmp *) func_block->block_list[i]->block[j])->f_target->exp_type == TEMP && get_reg_position(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target)->name) != -1) {
+					Tmp_s *tmp = new Tmp_s(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target), -1);
 					(((CJmp *) func_block->block_list[i]->block[j]))->f_target = tmp;
 				} else {
-					switch_to_tmps((Exp *) func_block->block_list[i]->block[j],
-							((CJmp *) func_block->block_list[i]->block[j])->f_target,
-							T_F);
+					switch_to_tmps((Exp *) func_block->block_list[i]->block[j], ((CJmp *) func_block->block_list[i]->block[j])->f_target, T_F);
 				}
 				break;
 			}
@@ -808,8 +688,7 @@ void switch_to_tmps(Exp *parent, Exp *exp, EXP_OPT opt) {
 		switch_to_tmps(exp, ((Cast *) exp)->exp, CAST_EXP);
 	} else if (exp->exp_type == MEM) {
 		switch_to_tmps(exp, ((Mem *) exp)->addr, ADDR);
-	} else if (exp->exp_type == TEMP
-			&& get_reg_position(((Temp *) exp)->name) != -1) {
+	} else if (exp->exp_type == TEMP && get_reg_position(((Temp *) exp)->name) != -1) {
 		if (parent == NULL) {
 			print_error("No parent for a Temp");
 			exit(1);
@@ -844,7 +723,7 @@ void switch_to_tmps(Exp *parent, Exp *exp, EXP_OPT opt) {
 			//printf("\tSwitch %s\n", ((Cast *) parent)->exp->tostring().c_str());
 			break;
 		}
-		default:{
+		default: {
 			//printf("A Temp without OPT: Don't switch to tmp\n");
 			break;
 		}
@@ -872,12 +751,8 @@ void build_cfg(fblock_ptr func_block) {
 					flag = 1;
 					//CJmp *buff_cjmp = (CJmp *)buff->clone();
 					/*!!different size cast!!*/
-					add_edge_cjmp(func_block,
-							((CJmp *) func_block->block_list[i]->block[j])->t_target,
-							i, C_T);
-					add_edge_cjmp(func_block,
-							((CJmp *) func_block->block_list[i]->block[j])->f_target,
-							i, C_F);
+					add_edge_cjmp(func_block, ((CJmp *) func_block->block_list[i]->block[j])->t_target, i, C_T);
+					add_edge_cjmp(func_block, ((CJmp *) func_block->block_list[i]->block[j])->f_target, i, C_F);
 					break;
 				}
 				case JMP: {
@@ -885,9 +760,7 @@ void build_cfg(fblock_ptr func_block) {
 					func_block->block_list[i]->branch_type = UN;
 					flag = 1;
 					//Jmp *buff_jmp = (Jmp *)buff->clone();
-					add_edge_jmp(func_block,
-							((Jmp *) func_block->block_list[i]->block[j])->target,
-							i);
+					add_edge_jmp(func_block, ((Jmp *) func_block->block_list[i]->block[j])->target, i);
 					break;
 				}
 				case SPECIAL: {
@@ -913,8 +786,7 @@ void build_cfg(fblock_ptr func_block) {
 	func_block->block_list[func_block->len - 4]->child_next = func_block->len - 3;
 }
 
-void to_basic_block(vector<vine_block_t *> vine_blocks, fblock_ptr func_block,
-		address_t end) {
+void to_basic_block(vector<vine_block_t *> vine_blocks, fblock_ptr func_block, address_t end) {
 
 	int begin_pos = -1;
 	int end_pos = -1;
@@ -930,8 +802,7 @@ void to_basic_block(vector<vine_block_t *> vine_blocks, fblock_ptr func_block,
 			begin_pos = i;
 		}
 		if (vine_blocks.at(i)->inst->address == end) {
-			if (end == vine_blocks.at(vine_blocks.size() - 1)->inst->address ||
-					end == begin) {
+			if (end == vine_blocks.at(vine_blocks.size() - 1)->inst->address || end == begin) {
 				end_pos = i;
 			} else {
 				end_pos = i - 1;
@@ -950,8 +821,7 @@ void to_basic_block(vector<vine_block_t *> vine_blocks, fblock_ptr func_block,
 	block_count = count_block(vine_blocks, begin_pos, end_pos);
 	func_block->len = block_count + 4;
 	//printf("\t%d blocks of BB\n",func_block->len);
-	func_block->block_list = (bblock_ptr *) malloc(
-			func_block->len * sizeof(bblock_ptr));
+	func_block->block_list = (bblock_ptr *) malloc(func_block->len * sizeof(bblock_ptr));
 
 	/*initialize each basic block in this function*/
 	for (i = 0; i < func_block->len; i++) {
@@ -972,13 +842,11 @@ void to_basic_block(vector<vine_block_t *> vine_blocks, fblock_ptr func_block,
 	func_block->block_list[k]->blen = 0;
 	k++;
 
-	func_block->block_list[k]->blen = get_blen(vine_blocks, begin_pos, 0,
-			end_pos);
+	func_block->block_list[k]->blen = get_blen(vine_blocks, begin_pos, 0, end_pos);
 	//printf("\t%block[%d]\t%d stmts\n",0,func_block->block_list[0]->blen);
 	func_block->block_list[k]->branch_type = UNKNOW;
 	func_block->block_list[k]->type = BLOCK;
-	func_block->block_list[k]->block = (Stmt **) malloc(
-			(func_block->block_list[k]->blen + REGMAX) * sizeof(Stmt*));
+	func_block->block_list[k]->block = (Stmt **) malloc((func_block->block_list[k]->blen + REGMAX) * sizeof(Stmt*));
 
 	for (i = begin_pos; i <= end_pos; i++) {
 		for (j = 0; j < vine_blocks.at(i)->vine_ir->size(); j++) {
@@ -986,17 +854,13 @@ void to_basic_block(vector<vine_block_t *> vine_blocks, fblock_ptr func_block,
 				k++;
 				stmt_count = 0;
 				func_block->block_list[k]->func = func_block->func;
-				func_block->block_list[k]->blen = get_blen(vine_blocks, i, j,
-						end_pos);
+				func_block->block_list[k]->blen = get_blen(vine_blocks, i, j, end_pos);
 				//printf("\t%block[%d]\t%d stmts\n",k,func_block->block_list[k]->blen);
 				func_block->block_list[k]->branch_type = UNKNOW;
 				func_block->block_list[k]->type = BLOCK;
-				func_block->block_list[k]->block = (Stmt **) malloc(
-						(func_block->block_list[k]->blen + REGMAX)
-								* sizeof(Stmt*));
+				func_block->block_list[k]->block = (Stmt **) malloc((func_block->block_list[k]->blen + REGMAX) * sizeof(Stmt*));
 			}
-			func_block->block_list[k]->block[stmt_count] =
-					vine_blocks.at(i)->vine_ir->at(j);
+			func_block->block_list[k]->block[stmt_count] = vine_blocks.at(i)->vine_ir->at(j);
 			stmt_count++;
 		}
 	}
@@ -1055,7 +919,7 @@ void remove_bblock(fblock_ptr func_block, int target) {
 /*Only use after remove_bblock()*/
 void remove_dom(fblock_ptr func_block, int target) {
 	int i;
-	int len = func_block->len + 1;	//Current length of doms[]
+	int len = func_block->len + 1; //Current length of doms[]
 	for (i = target + 1; i < len; i++) {
 		doms[i - 1].current_loop_processed = doms[i].current_loop_processed;
 		doms[i - 1].idom_id = doms[i].idom_id;
@@ -1094,8 +958,7 @@ int predecessor_num_lookup(fblock_ptr func_block, int index) {
 	}
 
 	for (i = 0; i < func_block->len - 3; i++) {
-		if (func_block->block_list[i]->child_jmp == index
-				|| func_block->block_list[i]->child_next == index) {
+		if (func_block->block_list[i]->child_jmp == index || func_block->block_list[i]->child_next == index) {
 			count++;
 		}
 	}
@@ -1106,30 +969,27 @@ int predecessor_num_lookup(fblock_ptr func_block, int index) {
 void add_comment(fblock_ptr vine_blocks) {
 	int i, j;
 
-	for(i = 0; i < vine_blocks->len; i++){
-		for(j = 0; j < vine_blocks->block_list[i]->blen; j++){
+	for (i = 0; i < vine_blocks->len; i++) {
+		for (j = 0; j < vine_blocks->block_list[i]->blen; j++) {
 			switch (vine_blocks->block_list[i]->block[j]->stmt_type) {
 			case JMP: {
 				//cerr << "add_comment_jmp" << endl;
-				add_comment_jmp(vine_blocks, i, j,
-						((Jmp *) vine_blocks->block_list[i]->block[j])->target);
+				add_comment_jmp(vine_blocks, i, j, ((Jmp *) vine_blocks->block_list[i]->block[j])->target);
 				break;
 			}
 			case CJMP: {
 				//cerr << "add_comment_jmp" << endl;
-				add_comment_jmp(vine_blocks, i, j,
-						((CJmp *) vine_blocks->block_list[i]->block[j])->t_target);
-				add_comment_jmp(vine_blocks, i, j,
-						((CJmp *) vine_blocks->block_list[i]->block[j])->f_target);
+				add_comment_jmp(vine_blocks, i, j, ((CJmp *) vine_blocks->block_list[i]->block[j])->t_target);
+				add_comment_jmp(vine_blocks, i, j, ((CJmp *) vine_blocks->block_list[i]->block[j])->f_target);
 				break;
 			}
 			case SPECIAL: {
 				//cerr << "add_comment_special" << endl;
 				//comment_stmt(vine_blocks, i, j);
 				Special *t_special = (Special *) vine_blocks->block_list[i]->block[j];
-				if(t_special->special == "call"){
+				if (t_special->special == "call") {
 					/*don't all comment to call*/
-				}else{
+				} else {
 					comment_stmt(vine_blocks, i, j);
 				}
 				break;
@@ -1142,35 +1002,35 @@ void add_comment(fblock_ptr vine_blocks) {
 }
 
 /*void add_comment(fblock_ptr vine_blocks) {
-	int i, j;
-	for(i = 0; i < vine_blocks->len; i++){
-		for(j = 0; j < vine_blocks->block_list[i]->blen; j++){
-			switch (vine_blocks->block_list[i]->block[j]->stmt_type) {
-			case JMP: {
-				//cerr << "add_comment_jmp" << endl;
-				add_comment_jmp(vine_blocks, i, j,
-						((Jmp *) vine_blocks->block_list[i]->block[j])->target);
-				break;
-			}
-			case CJMP: {
-				//cerr << "add_comment_jmp" << endl;
-				add_comment_jmp(vine_blocks, i, j,
-						((CJmp *) vine_blocks->block_list[i]->block[j])->t_target);
-				add_comment_jmp(vine_blocks, i, j,
-						((CJmp *) vine_blocks->block_list[i]->block[j])->f_target);
-				break;
-			}
-			case SPECIAL: {
-				//cerr << "add_comment_special" << endl;
-				comment_stmt(vine_blocks, i, j);
-				break;
-			}
-			default:
-				break;
-			}
-		}
-	}
-}*/
+ int i, j;
+ for(i = 0; i < vine_blocks->len; i++){
+ for(j = 0; j < vine_blocks->block_list[i]->blen; j++){
+ switch (vine_blocks->block_list[i]->block[j]->stmt_type) {
+ case JMP: {
+ //cerr << "add_comment_jmp" << endl;
+ add_comment_jmp(vine_blocks, i, j,
+ ((Jmp *) vine_blocks->block_list[i]->block[j])->target);
+ break;
+ }
+ case CJMP: {
+ //cerr << "add_comment_jmp" << endl;
+ add_comment_jmp(vine_blocks, i, j,
+ ((CJmp *) vine_blocks->block_list[i]->block[j])->t_target);
+ add_comment_jmp(vine_blocks, i, j,
+ ((CJmp *) vine_blocks->block_list[i]->block[j])->f_target);
+ break;
+ }
+ case SPECIAL: {
+ //cerr << "add_comment_special" << endl;
+ comment_stmt(vine_blocks, i, j);
+ break;
+ }
+ default:
+ break;
+ }
+ }
+ }
+ }*/
 
 int search_single_block_for_lable(fblock_ptr vine_blocks, int block, string lable) {
 	int i;
@@ -1235,7 +1095,7 @@ void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
 
 	if (target->exp_type == NAME) {
 		string target_name = ((Name *) target)->name;
-		if(target_name.substr(0,2) == "L_"){
+		if (target_name.substr(0, 2) == "L_") {
 			int index = search_raw_blocks(vine_blocks, ((Name *) target)->name, i);
 			if (index >= 0) {
 				//No need to comment
@@ -1244,18 +1104,18 @@ void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
 				comment_stmt(vine_blocks, i, j);
 			}
 
-		}else if(target_name.substr(0,5) == "pc_0x"){
+		} else if (target_name.substr(0, 5) == "pc_0x") {
 			address_t addr = name_to_hex(target_name);
-			if(addr >= vine_text->low_addr && addr < vine_text->high_addr){
-				if(addr >= start_addr && addr < end_addr){
+			if (addr >= vine_text->low_addr && addr < vine_text->high_addr) {
+				if (addr >= start_addr && addr < end_addr) {
 					/*control flow inside of the same function*/
 					/*no need to comment*/
-				}else{
+				} else {
 					/*static function call*/
 					/*trans to comment temperately*/
 					comment_stmt(vine_blocks, i, j);
 				}
-			}else{
+			} else {
 				/*dynamic function call*/
 				/*no need to comment*/
 			}
@@ -1269,20 +1129,14 @@ void add_comment_jmp(fblock_ptr vine_blocks, int i, int j, Exp *target) {
 
 void comment_stmt(fblock_ptr vine_blocks, int i, int j) {
 	if (vine_blocks->block_list[i]->block[j]->stmt_type != COMMENT) {
-		Comment *tmp = new Comment(
-				vine_blocks->block_list[i]->block[j]->tostring(),
-				vine_blocks->block_list[i]->block[j]->asm_address,
-				vine_blocks->block_list[i]->block[j]->ir_address);
+		Comment *tmp = new Comment(vine_blocks->block_list[i]->block[j]->tostring(), vine_blocks->block_list[i]->block[j]->asm_address, vine_blocks->block_list[i]->block[j]->ir_address);
 		vine_blocks->block_list[i]->block[j] = tmp;
 	}
 }
 
 void comment_stmt_inside(fblock_ptr func_block, int j, int k) {
 	if (func_block->block_list[j]->block[k]->stmt_type != COMMENT) {
-		Comment *tmp = new Comment(
-				func_block->block_list[j]->block[k]->tostring(),
-				func_block->block_list[j]->block[k]->asm_address,
-				func_block->block_list[j]->block[k]->ir_address);
+		Comment *tmp = new Comment(func_block->block_list[j]->block[k]->tostring(), func_block->block_list[j]->block[k]->asm_address, func_block->block_list[j]->block[k]->ir_address);
 		func_block->block_list[j]->block[k] = tmp;
 	}
 }
@@ -1296,14 +1150,12 @@ BOOL deep_first_search(fblock_ptr func_block, int current) {
 
 	/*Process current node*/
 	int new_idom = get_predecessor(func_block, doms, 0, current);
-	int next_predecessor = get_predecessor(func_block, doms, new_idom + 1,
-			current);
+	int next_predecessor = get_predecessor(func_block, doms, new_idom + 1, current);
 	while (next_predecessor != -1) {
 		if (doms[next_predecessor].processed == YES) {
 			new_idom = intersect(doms, next_predecessor, new_idom);
 		}
-		next_predecessor = get_predecessor(func_block, doms,
-				next_predecessor + 1, current);
+		next_predecessor = get_predecessor(func_block, doms, next_predecessor + 1, current);
 	}
 
 	if (doms[current].idom_id != new_idom) {
@@ -1315,25 +1167,19 @@ BOOL deep_first_search(fblock_ptr func_block, int current) {
 
 	/*Process branch(s)*/
 	if (func_block->block_list[current]->branch_type == BIN) {
-		if (doms[func_block->block_list[current]->child_jmp].current_loop_processed
-				== NO) {
-			tmp_1 = deep_first_search(func_block,
-					func_block->block_list[current]->child_jmp);
+		if (doms[func_block->block_list[current]->child_jmp].current_loop_processed == NO) {
+			tmp_1 = deep_first_search(func_block, func_block->block_list[current]->child_jmp);
 		}
-		if (doms[func_block->block_list[current]->child_next].current_loop_processed
-				== NO) {
-			tmp_2 = deep_first_search(func_block,
-					func_block->block_list[current]->child_next);
+		if (doms[func_block->block_list[current]->child_next].current_loop_processed == NO) {
+			tmp_2 = deep_first_search(func_block, func_block->block_list[current]->child_next);
 		}
 
 		if (tmp_1 == YES || tmp_2 == YES) {
 			result = YES;
 		}
 	} else if (func_block->block_list[current]->branch_type == UN) {
-		if (doms[func_block->block_list[current]->child_next].current_loop_processed
-				== NO) {
-			tmp_1 = deep_first_search(func_block,
-					func_block->block_list[current]->child_next);
+		if (doms[func_block->block_list[current]->child_next].current_loop_processed == NO) {
+			tmp_1 = deep_first_search(func_block, func_block->block_list[current]->child_next);
 		}
 		if (tmp_1 == YES) {
 			result = YES;
@@ -1411,39 +1257,25 @@ void add_phi(fblock_ptr func_block) {
 					//printf("Add %d to df[%d]\n",i,runner);
 					runner = doms[runner].idom_id;
 				}
-				next_predecessor = get_predecessor(func_block, doms,
-						next_predecessor + 1, i);
+				next_predecessor = get_predecessor(func_block, doms, next_predecessor + 1, i);
 			}
 		}
 	}
-
 
 	//Add Phi nodes
 	for (i = 0; i < func_block->len; i++) {
 		for (j = 0; j < func_block->block_list[i]->blen; j++) {
 			/*For each Move*/
 			if (func_block->block_list[i]->block[j]->stmt_type == MOVE) {
-				if (((Move *) func_block->block_list[i]->block[j])->lhs->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name)
-								!= -1) {
+				if (((Move *) func_block->block_list[i]->block[j])->lhs->exp_type == TEMP && get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name) != -1) {
 					//Register changed
 					//check exist Phi_s before Add new Phi_s
 					for (k = 0; k < df[i].size(); k++) {
-						if (check_duplicated_phi(func_block, df[i].at(k),
-								((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name)
-								== NO) {
+						if (check_duplicated_phi(func_block, df[i].at(k), ((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name) == NO) {
 
 							vector<Tmp_s*> v;
-							Phi_s * right =
-									new Phi_s(
-											((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name,
-											v);
-							Tmp_s * left =
-									new Tmp_s(
-											(Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs,
-											-2);
+							Phi_s * right = new Phi_s(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name, v);
+							Tmp_s * left = new Tmp_s((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs, -2);
 							Move * stmt = new Move(left, right, 0x0, 0x0);
 							//printf("[ %s| block %d] %s\n", func_block->func->name.c_str(), df[i].at(k), left->name.c_str());
 							//printf("%s\t result:%d\n",((Temp *)((Move *)func_block->block_list[i]->block[j])->lhs)->name.c_str(),get_reg_position(((Temp *)((Move *)func_block->block_list[i]->block[j])->lhs)->name));
@@ -1466,10 +1298,8 @@ BOOL check_duplicated_phi(fblock_ptr func_block, int block, string name) {
 	int i;
 	for (i = 0; i < func_block->block_list[block]->blen; i++) {
 		if (func_block->block_list[block]->block[i]->stmt_type == MOVE) {
-			if (((Move *) func_block->block_list[block]->block[i])->rhs->exp_type
-					== PHI) {
-				if (((Phi_s *) ((Move *) func_block->block_list[block]->block[i])->rhs)->phi_name
-						== name) {
+			if (((Move *) func_block->block_list[block]->block[i])->rhs->exp_type == PHI) {
+				if (((Phi_s *) ((Move *) func_block->block_list[block]->block[i])->rhs)->phi_name == name) {
 					result = YES;
 					break;
 				}
@@ -1508,15 +1338,13 @@ int intersect(struct idom *doms, int b1, int b2) {
 
 /*Return the next processed predecessor starting from begin*/
 /*Return -1 if no more predecessor exist*/
-int get_predecessor(fblock_ptr func_block, struct idom *doms, int begin,
-		int target) {
+int get_predecessor(fblock_ptr func_block, struct idom *doms, int begin, int target) {
 	int result = -1;
 	int i;
 	for (i = begin; i < func_block->len; i++) {
 		if (doms[i].processed == YES) {
 			if (func_block->block_list[i]->branch_type == BIN) {
-				if (func_block->block_list[i]->child_jmp == target
-						|| func_block->block_list[i]->child_next == target) {
+				if (func_block->block_list[i]->child_jmp == target || func_block->block_list[i]->child_next == target) {
 					result = i;
 					break;
 				}
@@ -1538,8 +1366,7 @@ int get_normal_predecessor(fblock_ptr func_block, int begin, int target) {
 	int i;
 	for (i = begin; i < func_block->len; i++) {
 		if (func_block->block_list[i]->branch_type == BIN) {
-			if (func_block->block_list[i]->child_jmp == target
-					|| func_block->block_list[i]->child_next == target) {
+			if (func_block->block_list[i]->child_jmp == target || func_block->block_list[i]->child_next == target) {
 				result = i;
 				if (result == target) {
 					result = -1;
@@ -1566,8 +1393,7 @@ int get_normal_predecessor(fblock_ptr func_block, int begin, int target) {
 void insert_stmt(fblock_ptr func_block, int block, int pos, Stmt *insert) {
 	int i;
 	for (i = func_block->block_list[block]->blen; i > pos; i--) {
-		func_block->block_list[block]->block[i] =
-				func_block->block_list[block]->block[i - 1];
+		func_block->block_list[block]->block[i] = func_block->block_list[block]->block[i - 1];
 	}
 	func_block->block_list[block]->blen++;
 	func_block->block_list[block]->block[pos] = insert;
@@ -1599,24 +1425,18 @@ void set_value(fblock_ptr func_block) {
 	for (i = 0; i < func_block->len; i++) {
 		for (j = 0; j < func_block->block_list[i]->blen; j++) {
 			switch (func_block->block_list[i]->block[j]->stmt_type) {
-			case SPECIAL:{
+			case SPECIAL: {
 				/*Renew eax after each special("call")*/
-				Special *sp = (Special *)func_block->block_list[i]->block[j];
-				if(sp->special == "call"){
-					global_counter ++;
+				Special *sp = (Special *) func_block->block_list[i]->block[j];
+				if (sp->special == "call") {
+					global_counter++;
 					current_number[R_EAX] = global_counter;
 				}
 				break;
 			}
 			case MOVE: {
-				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs)->name)
-								!= -1) {
-					position =
-							get_reg_position(
-									((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs)->name);
+				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type == TEMP && get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs)->name) != -1) {
+					position = get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs)->name);
 					if (position == -1) {
 						print_error("Invalid register name");
 						exit(1);
@@ -1625,44 +1445,28 @@ void set_value(fblock_ptr func_block) {
 						global_counter++;
 						current_number[position] = global_counter;
 					}
-					((Tmp_s *) ((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs))->index =
-							current_number[position];
+					((Tmp_s *) ((Temp *) ((Move *) func_block->block_list[i]->block[j])->rhs))->index = current_number[position];
 				} else {
-					set_exp_value(
-							((Move *) func_block->block_list[i]->block[j])->rhs);
+					set_exp_value(((Move *) func_block->block_list[i]->block[j])->rhs);
 				}
-				if (((Move *) func_block->block_list[i]->block[j])->lhs->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name)
-								!= -1) {
+				if (((Move *) func_block->block_list[i]->block[j])->lhs->exp_type == TEMP && get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name) != -1) {
 					global_counter++;
-					position =
-							get_reg_position(
-									((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name);
+					position = get_reg_position(((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs)->name);
 					if (position == -1) {
 						print_error("Invalid register name");
 						exit(1);
 					}
 					current_number[position] = global_counter;
-					((Tmp_s *) ((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs))->index =
-							current_number[position];
+					((Tmp_s *) ((Temp *) ((Move *) func_block->block_list[i]->block[j])->lhs))->index = current_number[position];
 
 				} else {
-					set_exp_value(
-							((Move *) func_block->block_list[i]->block[j])->lhs);
+					set_exp_value(((Move *) func_block->block_list[i]->block[j])->lhs);
 				}
 				break;
 			}
 			case JMP: {
-				if (((Jmp *) func_block->block_list[i]->block[j])->target->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target)->name)
-								!= -1) {
-					position =
-							get_reg_position(
-									((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target)->name);
+				if (((Jmp *) func_block->block_list[i]->block[j])->target->exp_type == TEMP && get_reg_position(((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target)->name) != -1) {
+					position = get_reg_position(((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target)->name);
 					if (position == -1) {
 						print_error("Invalid register name");
 						exit(1);
@@ -1671,23 +1475,15 @@ void set_value(fblock_ptr func_block) {
 						global_counter++;
 						current_number[position] = global_counter;
 					}
-					((Tmp_s *) ((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target))->index =
-							current_number[position];
+					((Tmp_s *) ((Temp *) ((Jmp *) func_block->block_list[i]->block[j])->target))->index = current_number[position];
 				} else {
-					set_exp_value(
-							((Jmp *) func_block->block_list[i]->block[j])->target);
+					set_exp_value(((Jmp *) func_block->block_list[i]->block[j])->target);
 				}
 				break;
 			}
 			case CJMP: {
-				if (((CJmp *) func_block->block_list[i]->block[j])->t_target->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target)->name)
-								!= -1) {
-					position =
-							get_reg_position(
-									((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target)->name);
+				if (((CJmp *) func_block->block_list[i]->block[j])->t_target->exp_type == TEMP && get_reg_position(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target)->name) != -1) {
+					position = get_reg_position(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target)->name);
 					if (position == -1) {
 						print_error("Invalid register name");
 						exit(1);
@@ -1696,20 +1492,12 @@ void set_value(fblock_ptr func_block) {
 						global_counter++;
 						current_number[position] = global_counter;
 					}
-					((Tmp_s *) ((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target))->index =
-							current_number[position];
+					((Tmp_s *) ((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->t_target))->index = current_number[position];
 				} else {
-					set_exp_value(
-							((CJmp *) func_block->block_list[i]->block[j])->t_target);
+					set_exp_value(((CJmp *) func_block->block_list[i]->block[j])->t_target);
 				}
-				if (((CJmp *) func_block->block_list[i]->block[j])->f_target->exp_type
-						== TEMP
-						&& get_reg_position(
-								((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target)->name)
-								!= -1) {
-					position =
-							get_reg_position(
-									((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target)->name);
+				if (((CJmp *) func_block->block_list[i]->block[j])->f_target->exp_type == TEMP && get_reg_position(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target)->name) != -1) {
+					position = get_reg_position(((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target)->name);
 					if (position == -1) {
 						print_error("Invalid register name");
 						exit(1);
@@ -1718,11 +1506,9 @@ void set_value(fblock_ptr func_block) {
 						global_counter++;
 						current_number[position] = global_counter;
 					}
-					((Tmp_s *) ((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target))->index =
-							current_number[position];
+					((Tmp_s *) ((Temp *) ((CJmp *) func_block->block_list[i]->block[j])->f_target))->index = current_number[position];
 				} else {
-					set_exp_value(
-							((CJmp *) func_block->block_list[i]->block[j])->f_target);
+					set_exp_value(((CJmp *) func_block->block_list[i]->block[j])->f_target);
 				}
 				break;
 			}
@@ -1743,8 +1529,7 @@ void set_exp_value(Exp *exp) {
 		set_exp_value(((Cast *) exp)->exp);
 	} else if (exp->exp_type == MEM) {
 		set_exp_value(((Mem *) exp)->addr);
-	} else if (exp->exp_type == TEMP
-			&& get_reg_position(((Temp *) exp)->name) != -1) {
+	} else if (exp->exp_type == TEMP && get_reg_position(((Temp *) exp)->name) != -1) {
 		int position = get_reg_position(((Temp *) exp)->name);
 		if (position == -1) {
 			print_error("Invalid register name");
@@ -1765,14 +1550,10 @@ void set_phi_para(fblock_ptr func_block) {
 	for (i = 0; i < func_block->len; i++) {
 		for (j = 0; j < func_block->block_list[i]->blen; j++) {
 			if (func_block->block_list[i]->block[j]->stmt_type == MOVE) {
-				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type
-						== PHI) {
-					position =
-							get_reg_position(
-									((Phi_s *) ((Move *) func_block->block_list[i]->block[j])->rhs)->phi_name);
+				if (((Move *) func_block->block_list[i]->block[j])->rhs->exp_type == PHI) {
+					position = get_reg_position(((Phi_s *) ((Move *) func_block->block_list[i]->block[j])->rhs)->phi_name);
 					if (position != -1) {
-						search_latest_assign(func_block, i, position,
-								func_block->block_list[i]->block[j]);
+						search_latest_assign(func_block, i, position, func_block->block_list[i]->block[j]);
 					}
 				}
 			}
@@ -1780,8 +1561,7 @@ void set_phi_para(fblock_ptr func_block) {
 	}
 }
 
-int search_latest_assign(fblock_ptr func_block, int target, int reg_num,
-		Stmt *func) {
+int search_latest_assign(fblock_ptr func_block, int target, int reg_num, Stmt *func) {
 	int result;
 	int i, j;
 
@@ -1806,20 +1586,17 @@ int search_latest_assign(fblock_ptr func_block, int target, int reg_num,
 		}
 		//printf("result = %d\n",result);
 		//Check whether this parameter has been inserted
-		if (((Phi_s *) ((Move *) func)->rhs)->check_duplicate_para(result)
-				== 0) {
-			Tmp_s * tmp = new Tmp_s(((Tmp_s *) ((Move *) func)->lhs)->typ,
-					((Tmp_s *) ((Move *) func)->lhs)->name, result);
+		if (((Phi_s *) ((Move *) func)->rhs)->check_duplicate_para(result) == 0) {
+			Tmp_s * tmp = new Tmp_s(((Tmp_s *) ((Move *) func)->lhs)->typ, ((Tmp_s *) ((Move *) func)->lhs)->name, result);
 			((Phi_s *) ((Move *) func)->rhs)->addVar(tmp);
 		}
 
-		next_predecessor = get_normal_predecessor(func_block,
-				next_predecessor + 1, target);
+		next_predecessor = get_normal_predecessor(func_block, next_predecessor + 1, target);
 	}
 	return result;
 }
 
-unsigned long long name_to_hex(string name){
+unsigned long long name_to_hex(string name) {
 	//string name: pc_0x80483fe -> hex number: 80483fe
 	unsigned long long res = 0;
 	std::stringstream str;
@@ -1835,12 +1612,9 @@ int get_latest_from_bblock(fblock_ptr func_block, int block, int reg_num) {
 	int i;
 	for (i = func_block->block_list[block]->blen - 1; i >= 0; i--) {
 		if (func_block->block_list[block]->block[i]->stmt_type == MOVE) {
-			if (((Move *) func_block->block_list[block]->block[i])->lhs->exp_type
-					== TEMP) {
-				if (((Temp *) ((Move *) func_block->block_list[block]->block[i])->lhs)->name
-						== str_reg[reg_num]) {
-					result =
-							((Tmp_s *) ((Temp *) ((Move *) func_block->block_list[block]->block[i])->lhs))->index;
+			if (((Move *) func_block->block_list[block]->block[i])->lhs->exp_type == TEMP) {
+				if (((Temp *) ((Move *) func_block->block_list[block]->block[i])->lhs)->name == str_reg[reg_num]) {
+					result = ((Tmp_s *) ((Temp *) ((Move *) func_block->block_list[block]->block[i])->lhs))->index;
 					break;
 				}
 			}

@@ -29,7 +29,7 @@ using namespace std;
 //         temp + id numebr
 // ------------------------------------------------------------
 Tmp_s::Tmp_s(Temp *tmp, int id) :
-		Temp(tmp->typ, tmp->name) , index(id) {
+		Temp(tmp->typ, tmp->name) , index(id){
 }
 
 Tmp_s::Tmp_s(reg_t typ, string name, int id) :

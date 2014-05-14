@@ -111,20 +111,19 @@ void print_path(Traits::vertex_descriptor &src, Traits::vertex_descriptor &des, 
 
 //look for specific operation on a specific register
 void look_for_binop(func_vertex_ptr func_block, int index, binop_type_t op, Graph &g){
-	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
+	boost::property_map<Graph, id_index_type_t>::type g_id = boost::get(id_index_type_t(), g);
 	boost::property_map<Graph, vertex_exp_type_t>::type g_type = boost::get(vertex_exp_type_t(), g);
-	int i;
-	for(i = 0; i < func_block->op_list.size(); i++){
-		if(func_block->op_list.at(i)->op_type == BIN_OP){
-			Bin_Operation * binop = (Bin_Operation *)func_block->op_list.at(i);
-			//printf("left: %d; right: %d\n",g_id[binop->operand_l],g_id[binop->operand_r]);
+	map<Exp *, Operation *>::iterator it;
+	for(it = func_block->op_list.begin(); it != func_block->op_list.end(); ++it){
+		if(it->second->op_type == BIN_OP){
+			Bin_Operation * binop = (Bin_Operation *)it->second;
 			if(binop->binop_type == op){
 				if(g_type[binop->operand_l] == REGISTER){
-					if(((Tmp_s *)func_block->reg_list.at(g_id[binop->operand_l])->reg_info)->index == index){
+					if(((Tmp_s *)func_block->reg_list.at(g_id[binop->operand_l])->exp)->index == index){
 						printf("\t%s \n",binop->exp->tostring().c_str());
 					}
 				}else if(g_type[binop->operand_r] == REGISTER){
-					if(((Tmp_s *)func_block->reg_list.at(g_id[binop->operand_r])->reg_info)->index == index){
+					if(((Tmp_s *)func_block->reg_list.at(g_id[binop->operand_r])->exp)->index == index){
 						printf("\t%s \n",binop->exp->tostring().c_str());
 					}
 				}
@@ -136,13 +135,10 @@ void look_for_binop(func_vertex_ptr func_block, int index, binop_type_t op, Grap
 
 //look for operation on a specific node
 void look_for_binop_by_des(func_vertex_ptr func_block, Graph::vertex_descriptor des, binop_type_t op, Graph &g){
-	boost::property_map<Graph, identity_in_list_type_t>::type g_id = boost::get(identity_in_list_type_t(), g);
-	boost::property_map<Graph, vertex_exp_type_t>::type g_type = boost::get(vertex_exp_type_t(), g);
-	int i;
-	for(i = 0; i < func_block->op_list.size(); i++){
-		if(func_block->op_list.at(i)->op_type == BIN_OP){
-			Bin_Operation * binop = (Bin_Operation *)func_block->op_list.at(i);
-			//printf("left: %d; right: %d\n",g_id[binop->operand_l],g_id[binop->operand_r]);
+	map<Exp *, Operation *>::iterator it;
+	for(it = func_block->op_list.begin(); it != func_block->op_list.end(); ++it){
+		if(it->second->op_type == BIN_OP){
+			Bin_Operation * binop = (Bin_Operation *)it->second;
 			if(binop->binop_type == op){
 				if(binop->operand_l == des ||
 						binop->operand_r == des){
@@ -164,10 +160,10 @@ void id_to_vineir(func_vertex_ptr func_block, Graph &g){
 		exit(1);
 	}
 
-	int i;
-	for(i = 0; i < func_block->op_list.size(); i++){
-		if(func_block->op_list.at(i)->op_type == BIN_OP){
-			Bin_Operation * binop = (Bin_Operation *)func_block->op_list.at(i);
+	map<Exp *, Operation *>::iterator it;
+	for(it = func_block->op_list.begin(); it != func_block->op_list.end(); ++it){
+		if(it->second->op_type == BIN_OP){
+			Bin_Operation * binop = (Bin_Operation *)it->second;
 			fprintf(fp, "%d\t%s\n",binop->my_descriptor, binop->exp->tostring().c_str());
 		}
 	}
@@ -181,5 +177,13 @@ void print_ptargetlist(vector<Pointed *> &list){
 	for(i = 0; i < list.size(); i++){
 		list.at(i)->debug_info_list.at(0)->print_me();
 		cout<<"parent struct:"<<list.at(i)->debug_info_list.at(0)->parent->var_name<<endl;
+	}
+}
+
+void print_reg(func_vertex_ptr func_block){
+	map<int, Register *>::iterator it;
+	cout<<"reg list:"<<endl;
+	for(it = func_block->reg_list.begin(); it != func_block->reg_list.end(); it ++){
+		cout <<hex<<it->first<<":"<<it->second->exp->tostring()<<endl;
 	}
 }
