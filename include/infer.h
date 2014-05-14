@@ -5,9 +5,9 @@
 
 void dfs_min_cut(Graph::vertex_descriptor src, func_vertex_ptr func_block, Graph &g);
 int reg_name_to_dwop(Temp * tmp);
-bool check_duplicated_edge(int src_node, int des_node, Graph &g);
+bool check_duplicated_edge(func_vertex_ptr func_list, int src_node, int des_node, Graph &g);
 void print_capacity(Graph &g);
-Traits::edge_descriptor add_edge_with_cap(Traits::vertex_descriptor &v1,
+Traits::edge_descriptor add_edge_with_cap(func_vertex_ptr func_list, Traits::vertex_descriptor &v1,
                                 Traits::vertex_descriptor &v2,
                                 const double capacity_fwd,
                                 const double capacity_rev,

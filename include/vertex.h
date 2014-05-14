@@ -201,6 +201,13 @@ struct func_vertex_block{
 	map<int, Register *> reg_list;
 	map<Exp *, Operation *> op_list;
 
+	map<Exp *, Graph::vertex_descriptor> node_list;
+	// A list of all nodes' descriptors acquired by read_exp()
+	// A cache for optimization
+
+	set<pair<int , int> > edge_list;
+	// Cache for list, used in check_duplicated_edge()
+
 	pointer_list ptr_list;
 	Graph::vertex_descriptor s_des;
 	Graph::vertex_descriptor u_des;

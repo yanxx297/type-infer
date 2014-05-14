@@ -246,6 +246,9 @@ func_vertex_block::~func_vertex_block(){
 
 	/*clean pointer list*/
 	this->ptr_list.clear();
+
+	/*clean exp->node cache*/
+	this->node_list.clear();
 }
 
 //check whether var_c is a child of var_p in debug_info structure

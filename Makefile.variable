@@ -19,7 +19,8 @@ HOME=/home/yanxx297/project/src
 
 LDFLAGS=-L$(DWARF) -L$(VINE)/src -L$(VEX) -L$(BINUTILS)/lib -Wl,-R$(BINUTILS)/lib 
 CFLAGS=-Wall -w
-FLAGS=-g -pg
+FLAGS=-g
+#add -pg for profiling
 I_VINE=-I$(DWARF) -I$(VINE)/src/include -I$(VEX)/pub -I$(VINE)
 INCLUDE=-I$(HOME)/include -I$(BINUTILS)/include
 LIBS=-lasmir -lvex -lbfd -liberty -lopcodes -ldwarf -lelf

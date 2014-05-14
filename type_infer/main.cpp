@@ -682,7 +682,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g){
 					break;
 				}
 
-				add_edge_with_cap(v_r,v_l, 1, 1, g);
+				add_edge_with_cap(func_list, v_r,v_l, 1, 1, g);
 				break;
 			}
 			case COMMENT:{

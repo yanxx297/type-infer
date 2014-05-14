@@ -112,16 +112,12 @@ int reg_name_to_dwop(Temp * tmp) {
 }
 
 //Given 2 nodes of an edge, check whether this edge is already in this graph g.
-bool check_duplicated_edge(int src_node, int des_node, Graph &g) {
-	bool result = false;
-
-	boost::graph_traits<Graph>::edge_iterator ei, ei_end;
-	for (tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei) {
-		if (source(*ei, g) == src_node && target(*ei, g) == des_node) {
-			result = true;
-		}
+bool check_duplicated_edge(func_vertex_ptr func_list, int src_node, int des_node, Graph &g) {
+	if(func_list->edge_list.count(pair<int, int>(src_node, des_node)) > 0){
+		return true;
+	}else{
+		return false;
 	}
-	return result;
 }
 
 void print_capacity(Graph &g) {
@@ -136,29 +132,28 @@ void print_capacity(Graph &g) {
 				std::cout << "Source: " << *u_iter << " destination: " << target(*ei, g) << " capacity: " << capacity[*ei] << "residual cap: " << residual_capacity[*ei] << " used capacity: " << (capacity[*ei] - residual_capacity[*ei]) << std::endl;
 }
 
-Traits::edge_descriptor add_edge_with_cap(Traits::vertex_descriptor &v1, Traits::vertex_descriptor &v2, const double capacity_fwd, const double capacity_rev, Graph &g) {
+Traits::edge_descriptor add_edge_with_cap(func_vertex_ptr func_list, Traits::vertex_descriptor &v1, Traits::vertex_descriptor &v2, const double capacity_fwd, const double capacity_rev, Graph &g) {
 	//check invalid node descriptor
 	if (v1 == -1 || v2 == -1) {
 		//Invalid. Do nothing
 	} else {
 		//	Check duplicated edge
 		boost::property_map<Graph, boost::edge_reverse_t>::type rev = boost::get(boost::edge_reverse, g);
-		if (check_duplicated_edge(v1, v2, g) == false && v1 != v2) {
+		if (check_duplicated_edge(func_list, v1, v2, g) == false && v1 != v2) {
 			Traits::edge_descriptor e1 = add_edge(v1, v2, g).first;
 			Traits::edge_descriptor e2 = add_edge(v2, v1, g).first;
+
 			boost::put(boost::edge_capacity, g, e1, capacity_fwd);
-			//boost::put(boost::edge_capacity, g, e1, 0);
 			boost::put(boost::edge_capacity, g, e2, capacity_fwd);
 
-#ifdef DEBUG
-			printf("Add edge between %d and %d\n",v1, v2);
-#endif
 			rev[e1] = e2;
 			rev[e2] = e1;
 
 			boost::property_map<Graph, visedge_type_t>::type g_evis = boost::get(visedge_type_t(), g);
 			g_evis[e1] = true;
 			g_evis[e2] = false;
+
+			func_list->edge_list.insert(pair<int, int>(v1, v2));
 		}
 	}
 }
@@ -405,7 +400,8 @@ bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *bloc
 }
 
 /*Look for the defination of SF*/
-/*Return the corresponding nodes of var/reg/exp in the equation of SF*/bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g) {
+/*Return the corresponding nodes of var/reg/exp in the equation of SF*/
+bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g) {
 	Exp *def;
 	bool result = false;
 	Graph::vertex_descriptor opr_l = -1;
@@ -447,22 +443,15 @@ bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *bloc
 			if (((BinOp *) tmp)->lhs != 0) {
 				opr_l = node_searcher(func_list, block_no, stmt_no, ((BinOp *) tmp)->lhs);
 				if (opr_l != -1) {
-					add_edge_with_cap(func_list->s_des, opr_l, MAX_CAP, 0, g);
+					add_edge_with_cap(func_list, func_list->s_des, opr_l, MAX_CAP, 0, g);
 				}
 			}
 			if (((BinOp *) tmp)->rhs != 0) {
 				opr_r = node_searcher(func_list, block_no, stmt_no, ((BinOp *) tmp)->rhs);
 				if (opr_r != -1) {
-					add_edge_with_cap(func_list->s_des, opr_r, MAX_CAP, 0, g);
+					add_edge_with_cap(func_list, func_list->s_des, opr_r, MAX_CAP, 0, g);
 				}
 			}
-
-			//connect a and b to signed node
-//			if(opr_l != -1 && opr_r != -1){
-//				add_edge_with_cap(func_list->s_des, opr_l, MAX_CAP, 0, g);
-//				add_edge_with_cap(func_list->s_des, opr_r, MAX_CAP, 0, g);
-//			}
-
 		}
 	}
 
@@ -512,13 +501,13 @@ bool cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_n
 			if (((BinOp *) tmp)->lhs != 0) {
 				opr_l = node_searcher(func_list, block_no, stmt_no, ((BinOp *) tmp)->lhs);
 				if (opr_l != -1) {
-					add_edge_with_cap(opr_l, func_list->u_des, MAX_CAP, 0, g);
+					add_edge_with_cap(func_list, opr_l, func_list->u_des, MAX_CAP, 0, g);
 				}
 			}
 			if (((BinOp *) tmp)->rhs != 0) {
 				opr_r = node_searcher(func_list, block_no, stmt_no, ((BinOp *) tmp)->rhs);
 				if (opr_r != -1) {
-					add_edge_with_cap(opr_r, func_list->u_des, MAX_CAP, 0, g);
+					add_edge_with_cap(func_list, opr_r, func_list->u_des, MAX_CAP, 0, g);
 				}
 			}
 		}
@@ -542,17 +531,17 @@ void smod_operand_handler(func_vertex_ptr func_block, Graph::vertex_descriptor o
 			Graph::vertex_descriptor opr_r = ((Bin_Operation *) func_block->op_list.at(g_exp[operand_binop]))->operand_r;
 			if (g_vet[opr_l] == OPERATION && (g_vet[opr_r] == REGISTER || g_vet[opr_r] == VARIABLE)) {
 				cout << "set " << g_name[opr_l] << " to sigend (%$)" << endl;
-				add_edge_with_cap(func_block->s_des, opr_r, MAX_CAP, 0, g);
+				add_edge_with_cap(func_block, func_block->s_des, opr_r, MAX_CAP, 0, g);
 			} else if (g_vet[opr_r] == OPERATION && (g_vet[opr_l] == REGISTER || g_vet[opr_l] == VARIABLE)) {
 				cout << "set " << g_name[opr_r] << " to sigend (%$)" << endl;
-				add_edge_with_cap(func_block->s_des, opr_l, MAX_CAP, 0, g);
+				add_edge_with_cap(func_block, func_block->s_des, opr_l, MAX_CAP, 0, g);
 			}
 
 		}
 	}
 
 	//Handle var/register
-	add_edge_with_cap(func_block->s_des, operand_var, MAX_CAP, 0, g);
+	add_edge_with_cap(func_block, func_block->s_des, operand_var, MAX_CAP, 0, g);
 }
 
 void handle_smod(func_vertex_ptr func_block, int descriptor, Graph& g) {
@@ -593,11 +582,11 @@ void mod_operand_handler(func_vertex_ptr func_block, Graph::vertex_descriptor op
 			Graph::vertex_descriptor opr_r = ((Bin_Operation *) func_block->op_list.at(g_id[operand_binop]))->operand_r;
 			//printf("left:%s\tright:%s\n",g_name[opr_l].c_str(),g_name[opr_r].c_str());
 			if (g_vet[opr_l] == OPERATION && (g_vet[opr_r] == REGISTER || g_vet[opr_r] == VARIABLE)) {
-				add_edge_with_cap(opr_r, func_block->u_des, MAX_CAP, 0, g);
+				add_edge_with_cap(func_block, opr_r, func_block->u_des, MAX_CAP, 0, g);
 				cout << "set " << g_name[opr_r] << " to unsigend (%)" << endl;
 				//printf("Add edge\n");
 			} else if (g_vet[opr_r] == OPERATION && (g_vet[opr_l] == REGISTER || g_vet[opr_l] == VARIABLE)) {
-				add_edge_with_cap(opr_l, func_block->u_des, MAX_CAP, 0, g);
+				add_edge_with_cap(func_block, opr_l, func_block->u_des, MAX_CAP, 0, g);
 				cout << "set " << g_name[opr_l] << " to unsigend (%)" << endl;
 				//printf("Add edge\n");
 			} else {
@@ -608,7 +597,7 @@ void mod_operand_handler(func_vertex_ptr func_block, Graph::vertex_descriptor op
 	}
 
 	//Handle var/register
-	add_edge_with_cap(operand_var, func_block->u_des, MAX_CAP, 0, g);
+	add_edge_with_cap(func_block, operand_var, func_block->u_des, MAX_CAP, 0, g);
 }
 
 //descriptor is the descriptor of % operation
@@ -648,13 +637,13 @@ void handle_sar(func_vertex_ptr func_block, int descriptor, Graph& g) {
 			if (op_l != -1) {
 				if (g_vet[op_l] == VARIABLE) {
 					if (func_block->variable_list.at(g_id[op_l])->debug_info->var_length == 4) {
-						add_edge_with_cap(func_block->s_des, op_l, MAX_CAP, 0, g);
+						add_edge_with_cap(func_block, func_block->s_des, op_l, MAX_CAP, 0, g);
 						cout << "set " << g_name[op_l] << " to sigend ($>>)" << endl;
 					}
 				} else if (g_vet[op_l] == REGISTER) {
 					if (func_block->reg_list.at(g_index[op_l])->exp->exp_type == TEMP) {
 						if (((Temp *) func_block->reg_list.at(g_index[op_l])->exp)->typ == REG_32) {
-							add_edge_with_cap(func_block->s_des, op_l, MAX_CAP, 0, g);
+							add_edge_with_cap(func_block, func_block->s_des, op_l, MAX_CAP, 0, g);
 							cout << "set " << g_name[op_l] << " to sigend ($>>)" << endl;
 						}
 					}
@@ -697,13 +686,13 @@ void handle_shr(func_vertex_ptr func_block, int descriptor, Graph& g) {
 			if (op_l != -1) {
 				if (g_vet[op_l] == VARIABLE) {
 					if (func_block->variable_list.at(g_id[op_l])->debug_info->var_length == 4) {
-						add_edge_with_cap(op_l, func_block->u_des, MAX_CAP, 0, g);
+						add_edge_with_cap(func_block, op_l, func_block->u_des, MAX_CAP, 0, g);
 						cout << "set " << g_name[op_l] << "to unsigend (>>)" << endl;
 					}
 				} else if (g_vet[op_l] == REGISTER) {
 					if (func_block->reg_list.at(g_index[op_l])->exp->exp_type == TEMP) {
 						if (((Temp *) func_block->reg_list.at(g_index[op_l])->exp)->typ == REG_32) {
-							add_edge_with_cap(op_l, func_block->u_des, MAX_CAP, 0, g);
+							add_edge_with_cap(func_block, op_l, func_block->u_des, MAX_CAP, 0, g);
 							cout << "set " << g_name[op_l] << "to unsigend (>>)" << endl;
 						}
 					}
@@ -932,10 +921,10 @@ void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::verte
 		if (m_src->typ < dst->typ) {
 			if (src->cast_type == CAST_SIGNED) {
 				//movsbl -> signed
-				add_edge_with_cap(func_list->s_des, v_src, MAX_CAP, 0, g);
+				add_edge_with_cap(func_list, func_list->s_des, v_src, MAX_CAP, 0, g);
 			} else if (src->cast_type == CAST_UNSIGNED) {
 				//movzbl -> unsigned
-				add_edge_with_cap(v_src, func_list->u_des, MAX_CAP, 0, g);
+				add_edge_with_cap(func_list, v_src, func_list->u_des, MAX_CAP, 0, g);
 			} else {
 				//neither
 				//do nothing
@@ -1241,10 +1230,10 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 		if (vtd != -1) {
 			if (su_param == SIGNED_T) {
 				cout << current_exp->tostring() << "is signed because of libc info" << endl;
-				add_edge_with_cap(func_list->s_des, vtd, MAX_CAP, 0, g);
+				add_edge_with_cap(func_list, func_list->s_des, vtd, MAX_CAP, 0, g);
 			} else if (su_param == UNSIGNED_T) {
 				cout << current_exp->tostring() << "is unsigned because of libc info" << endl;
-				add_edge_with_cap(vtd, func_list->u_des, MAX_CAP, 0, g);
+				add_edge_with_cap(func_list, vtd, func_list->u_des, MAX_CAP, 0, g);
 			} else {
 				perror("UNKNOWN type parameter\n");
 			}
@@ -1281,6 +1270,9 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g) {
 	bool res;
 	Graph::vertex_descriptor vtd = -1;
+	if(func_block->node_list.count(exp) > 0){
+		return func_block->node_list.at(exp);
+	}
 	switch (exp->exp_type) {
 	case BINOP: {
 		//Don't add this operation to graph if both operands are constant
@@ -1320,10 +1312,10 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 			g_name[v_op] = number_str + ":" + binop_label[((BinOp *) exp)->binop_type];
 
 			if (v_l != -1) {
-				add_edge_with_cap(v_l, v_op, 1, 0, g);
+				add_edge_with_cap(func_block, v_l, v_op, 1, 0, g);
 			}
 			if (v_r != -1) {
-				add_edge_with_cap(v_r, v_op, 1, 0, g);
+				add_edge_with_cap(func_block, v_r, v_op, 1, 0, g);
 			}
 
 			vtd = v_op;
@@ -1362,7 +1354,7 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 			g_name[v_op] = unop_label[((UnOp *) exp)->unop_type];
 
 			if (v_target != -1) {
-				add_edge_with_cap(v_target, v_op, 1, 0, g);
+				add_edge_with_cap(func_block, v_target, v_op, 1, 0, g);
 			}
 			vtd = v_op;
 		} else {
@@ -1412,7 +1404,7 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 					dvariable *var = func_block->variable_list.at(count)->debug_info;
 					if (var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true) {
 						//cout<<func_block->stmt_block->block_list[block]->block[stmt]->tostring()<<endl;
-						add_edge_with_cap(vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
+						add_edge_with_cap(func_block, vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
 					}
 				}
 			}
@@ -1457,6 +1449,10 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 	default:
 		break;
 	}
+
+	//if(vtd != -1){
+		func_block->node_list.insert(pair<Exp *, Graph::vertex_descriptor>(exp, vtd));
+	//}
 	return vtd;
 }
 
@@ -1494,7 +1490,7 @@ bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int bloc
 							if (arr->loclist.at(j)->loc_type == OFFSET_LOC) {
 								offset_loc *loc = ((offset_loc *) arr->loclist.at(j));
 								if (loc->offset == offset && loc->reg_name == tmp->name) {
-									add_edge_with_cap(op, func_block->variable_list.at(i)->my_descriptor, 1, 1, g);
+									add_edge_with_cap(func_block, op, func_block->variable_list.at(i)->my_descriptor, 1, 1, g);
 									return true;
 								}
 							}
@@ -1739,9 +1735,9 @@ bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, fblock_ptr vine_ir_block
 
 			sign_type_t sut = ((dbase *) var_l_base)->original_su;
 			if (sut == SIGNED_T) {
-				add_edge_with_cap(func_list->s_des, vtd, MAX_CAP, 0, g);
+				add_edge_with_cap(func_list, func_list->s_des, vtd, MAX_CAP, 0, g);
 			} else if (sut == UNSIGNED_T) {
-				add_edge_with_cap(vtd, func_list->u_des, MAX_CAP, 0, g);
+				add_edge_with_cap(func_list, vtd, func_list->u_des, MAX_CAP, 0, g);
 			}
 
 			return true;
@@ -1827,9 +1823,9 @@ bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, fblock_ptr vine_ir_block
 						//Set s/u type according to ptarget_list
 						sign_type_t sut = ptarget_list.at(i)->debug_info_list.at(0)->original_su;
 						if (sut == SIGNED_T) {
-							add_edge_with_cap(func_list->s_des, pstack.at(j)->my_descriptor, MAX_CAP, 0, g);
+							add_edge_with_cap(func_list, func_list->s_des, pstack.at(j)->my_descriptor, MAX_CAP, 0, g);
 						} else if (sut == UNSIGNED_T) {
-							add_edge_with_cap(pstack.at(j)->my_descriptor, func_list->u_des, MAX_CAP, 0, g);
+							add_edge_with_cap(func_list, pstack.at(j)->my_descriptor, func_list->u_des, MAX_CAP, 0, g);
 						}
 						break;
 					}
@@ -2008,9 +2004,9 @@ bool set_single_edge(func_vertex_ptr func_list, Exp *exp, int block, int stmt, s
 	Graph::vertex_descriptor vtd = read_exp(func_list, current_block, current_stmt, exp, g);
 	if (vtd != -1) {
 		if (signedness == SIGNED_T) {
-			add_edge_with_cap(func_list->s_des, vtd, MAX_CAP, 0, g);
+			add_edge_with_cap(func_list, func_list->s_des, vtd, MAX_CAP, 0, g);
 		} else if (signedness == UNSIGNED_T) {
-			add_edge_with_cap(vtd, func_list->u_des, MAX_CAP, 0, g);
+			add_edge_with_cap(func_list, vtd, func_list->u_des, MAX_CAP, 0, g);
 		} else {
 			return false;
 		}
