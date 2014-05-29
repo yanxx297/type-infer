@@ -32,7 +32,7 @@ location::location(location *source)
 
 bool location::pc_cmp(address_t addr){
 	bool result = false;
-	if(addr <= this->high_pc && addr >= this->low_pc ){
+	if(addr <= this->high_pc && addr > this->low_pc ){
 		result = true;
 	}
 	return result;

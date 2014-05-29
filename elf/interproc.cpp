@@ -46,9 +46,9 @@ void get_relplt(Elf *elf, size_t shstrndx, map <int, call_map *> &call_table){
 				gelf_getrel (edata, i, &rel);
 				struct call_map *t_map = new struct call_map();
 				index = ELF64_R_SYM(rel.r_info); // FIXME: 32? 64?
-				t_map->addr = plt_range.low_addr + index*(0x10);
+				t_map->addr = plt_range.low_addr + (i+1)*(0x10);
 				//t_map->func_name = "<empty>";
-				cout<<"#"<<i<<": sym index = "<<index<<":"<<hex<<t_map->addr<<endl;
+				//cout<<"#"<<i<<": sym index = "<<index<<":"<<hex<<t_map->addr<<endl;
 				call_table.insert(pair<int, call_map *>(index, t_map));
 			}
 
@@ -76,10 +76,10 @@ void get_dynsym(Elf *elf, size_t shstrndx, map <int, call_map *> &call_table){
 			for (i = 0; i < count; i++) {
 				gelf_getsym(edata, i, &sym);
 
-				if(ELF32_ST_TYPE(sym.st_info) == STT_FUNC){
+				if(ELF32_ST_TYPE(sym.st_info) == STT_FUNC && call_table.count(i) > 0){
 					if ((name = elf_strptr(elf, shdr.sh_link, sym.st_name)) == NULL)
 						errx(EXIT_FAILURE, "elf_strptr() failed: %s.", elf_errmsg(-1));
-					//printf("%s\n", name);
+					//printf("%d -> %s\n", i, name);
 					call_table.at(i)->func_name = std::string(name);
 					//struct call_map * t_map = new struct call_map();
 					//t_map->addr = call_table[i]->addr;
@@ -110,7 +110,7 @@ void get_sec_range(Elf *elf, char *sec_name, size_t shstrndx, Elf64_Addr *low_ad
 			errx(EXIT_FAILURE, "elf_strptr() failed: %s.", elf_errmsg(-1));
 
 		if (strcmp(name, sec_name) == 0) {
-			(void) printf("Section %-4.4jd %s %x\n", (uintmax_t) elf_ndxscn(scn), name, shdr.sh_addr);
+			//(void) printf("Section %-4.4jd %s %x\n", (uintmax_t) elf_ndxscn(scn), name, shdr.sh_addr);
 			*(low_addr) = shdr.sh_addr;
 			*(high_addr) = shdr.sh_addr + shdr.sh_size;
 			break;
@@ -143,7 +143,7 @@ void get_call_table(char *filename, map <int, call_map *> &call_table, struct ad
 
 	//get plt section range
 	get_sec_range(elf, ".plt", shstrndx, &(plt_range.low_addr), &(plt_range.high_addr));
-	cout<<hex<<plt_range.low_addr<<" "<<hex<<plt_range.high_addr<<endl;
+	//cout<<hex<<plt_range.low_addr<<" "<<hex<<plt_range.high_addr<<endl;
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL)
 		errx(EXIT_FAILURE, "elf_begin() failed: %s.", elf_errmsg(-1));
 
@@ -151,7 +151,7 @@ void get_call_table(char *filename, map <int, call_map *> &call_table, struct ad
 	get_sec_range(elf, ".text", shstrndx, &(text_range.low_addr), &(text_range.high_addr));
 	text->high_addr = text_range.high_addr;
 	text->low_addr = text_range.low_addr;
-	cout<<hex<<text_range.low_addr<<" "<<hex<<text_range.high_addr<<endl;
+	//cout<<hex<<text_range.low_addr<<" "<<hex<<text_range.high_addr<<endl;
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL)
 		errx(EXIT_FAILURE, "elf_begin() failed: %s.", elf_errmsg(-1));
 
@@ -159,12 +159,6 @@ void get_call_table(char *filename, map <int, call_map *> &call_table, struct ad
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL)
 		errx(EXIT_FAILURE, "elf_begin() failed: %s.", elf_errmsg(-1));
 	get_dynsym(elf, shstrndx, call_table);
-
-//	printf("%d\n",call_table.size());
-//	map <int, call_map *>::iterator it;
-//	for(it = call_table.begin(); it != call_table.end(); it ++){
-//		cout<<it->first<<":"<<hex<<it->second->addr<<" "<<it->second->func_name<<endl;
-//	}
 
 
 	(void) elf_end(elf);

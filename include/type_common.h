@@ -13,6 +13,7 @@
 #define UNK "un.txt"
 #define DBGLIB "libc-2.15.so"	//path of libc's debug info on :/usr/lib/debug/lib/i386-linux-gnu
 									//should be avaliable by default
+#define SLOG "struct.log"
 
 typedef enum{
 	DVAR_BASE = 0,
@@ -38,6 +39,7 @@ enum hardcode_func_t{
 	IFUNC_INDEX,
 	IFUNC_STRCMP,
 	IFUNC_STRCPY,
+	IFUNC_STRRCHR,
 	IFUNC_STRCSPN,
 	IFUNC_STRLEN,
 	IFUNC_STRNLEN,
@@ -102,6 +104,7 @@ static std::string indirect[] = {
 		"index",
 		"strcmp",
 		"strcpy",
+		"strrchr",
 		"strcspn",
 		"strlen",
 		"strnlen",

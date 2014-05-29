@@ -85,7 +85,7 @@ bool Pointed::cmp_ptr_type(dvariable * ptr){
 //Compare two ptargets based on name and size
 //For check_call_pointer()
 bool Pointed::cmp_pointed(Pointed *ptr){
-	cout<<ptr->debug_info_list.at(0)->var_name<<"v.s."<<this->debug_info_list.at(0)->var_name<<endl;
+	//cout<<ptr->debug_info_list.at(0)->var_name<<"v.s."<<this->debug_info_list.at(0)->var_name<<endl;
 	if(ptr->debug_info_list.at(0)->var_length != this->debug_info_list.at(0)->var_length){
 		return false;
 	}
@@ -183,10 +183,10 @@ bool pointer_list::add_pointer(dptr *debug_info){
 	}
 
 	/*Check duplicate of p_info itself*/
-	if(check_plist(p_info->debug_info, this->plist) == -1){
+	//if(check_plist(p_info->debug_info, this->plist) == -1){
 		this->plist.push_back(p_info);
 		res = true;
-	}
+	//}
 
 	return res;
 }
@@ -311,5 +311,6 @@ bool check_child_from_parent(dvariable *var_p, dvariable *var_c){
 		break;
 	}
 	}
+	return res;
 }
 

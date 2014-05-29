@@ -126,6 +126,7 @@ public:
 	vector <dbase *> debug_info_list;
 	string ptr_name;
 	sign_type_t infered_su;
+	bool libdbg;	//whether this ptr is "infered" directly from libc
 };
 
 class Register: public vertex{

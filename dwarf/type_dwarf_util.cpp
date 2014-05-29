@@ -672,14 +672,14 @@ bool cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 				}
 			}
 		}
-//		else if(var->loclist.at(i)->loc_type == REG_LOC){
-//			//cout<<"compare ("<<regname<<","<<offset<<") and "<<var->loclist.at(i)->tostring()<<endl;
-//			reg_loc * loc = (reg_loc *)var->loclist.at(i);
-//			if(loc->reg_name == regname && cmp_offset(offset, var) == true){
-//				result = true;
-//				break;
-//			}
-//		}
+		else if(var->loclist.at(i)->loc_type == REG_LOC){
+			//cout<<"compare ("<<regname<<","<<offset<<") and "<<var->loclist.at(i)->tostring()<<endl;
+			reg_loc * loc = (reg_loc *)var->loclist.at(i);
+			if(loc->reg_name == regname && cmp_offset(offset, var) == true){
+				result = true;
+				break;
+			}
+		}
 	}
 
 	return result;

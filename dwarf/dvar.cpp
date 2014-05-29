@@ -34,14 +34,14 @@ dvariable::dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> fram
 	/*name*/
 	get_die_name(dbg, die_var, name);
 	this->var_name = name;
-	cout<<"[dvar] create source "<<name<<endl;
+	//cout<<"[dvar] create source "<<name<<endl;
 
 	/*type offset*/
 	get_die_type(dbg, die_var, &die_type, &off_type);
 	this->var_type = off_type;
 
 	/*location list*/
-	cout<<this->var_name<<" get loc_list:"<<endl;
+	//cout<<this->var_name<<" get loc_list:"<<endl;
 	get_die_loclist(dbg, die_var, this->loclist, frame_base);
 }
 
@@ -92,7 +92,7 @@ void dvariable::print_dvar(){
 	if(this->leaf == true){
 		cout<<"Is a Leaf."<<endl;
 	}
-	cout<<"type off: 0x"<<hex<<this->var_type<<endl;
+	cout<<"type off: 0x"<<hex<<this->var_type<<"("<<this->type_name<<")"<<endl;
 	cout<<"offset:"<<this->s_offset<<endl;
 	cout<<"parent: 0x"<<hex<<this->parent<<endl;
 
@@ -229,7 +229,7 @@ DVAR_TYPE_T dvariable::original_type(){
 }
 
 dbase::dbase(dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
-:dvariable(source)
+:dvariable(source), libdbg(false)
 {
 	int i, j;
 	int size = 0;
@@ -283,6 +283,8 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 	Dwarf_Die die_member = 0;
 	Dwarf_Half tag_member = 0;
 	Dwarf_Error error = 0;
+	string name;
+	string type_name;
 
 	/*set dvariable*/
 	this->s_offset = member_loc;
@@ -292,9 +294,17 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 	/*set type*/
 	this->var_type = off_type;
 
+	/*type name*/
+	get_die_name(dbg, die_type, name);
+	this->type_name = name;
+
 	/*get length*/
 	get_die_size(die_type, &size);
 	this->struct_length = size;
+
+	/*type name*/
+	get_die_name(dbg, die_type, type_name);
+	this->type_name = type_name;
 
 	/*Add members into vector*/
 	res = dwarf_child(die_type, &die_member, &error);
@@ -376,6 +386,7 @@ darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off
 	int array_size = 0;
 	Dwarf_Die die_element_type = 0;
 	Dwarf_Off off_element_type = 0;
+	string type_name;
 
 	/*set dvariable*/
 	this->s_offset = member_loc;
@@ -384,6 +395,10 @@ darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off
 
 	/*set type*/
 	this->var_type = off_type;
+
+	/*type name*/
+	get_die_name(dbg, die_type, type_name);
+	this->type_name = type_name;
 
 	/*set array size*/
 	get_array_size(die_type, &array_size);
@@ -440,6 +455,7 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 	bool result = false;
 	Dwarf_Die die_target_type = 0;
 	Dwarf_Off off_target_type = 0;
+	string type_name;
 
 	/*set dvariable*/
 	this->s_offset = member_loc;
@@ -448,6 +464,10 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 
 	/*set type*/
 	this->var_type = off_type;
+
+	/*type name*/
+	get_die_name(dbg, die_type, type_name);
+	this->type_name = type_name;
 
 	/*customize loc_list*/
 	customize_loclist(this);
@@ -491,6 +511,7 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 			break;
 		}
 		default:{
+			this->var = 0;
 			break;
 		}
 		}

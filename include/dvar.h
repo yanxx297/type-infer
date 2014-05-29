@@ -18,6 +18,7 @@ public:
 
 	/*information that available in variable DIE or DIEs before typeDIE*/
 	string var_name;
+	string type_name;
 	Dwarf_Off var_type; // the offset of type die of this variable, no matter its base/struc/array/ptr
 	vector<location *> loclist;
 
@@ -33,6 +34,7 @@ class dbase: public dvariable{
 public:
 	dbase(dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent);
 	void print_me();
+	bool libdbg;	//whether this variable is "infered" directly from libc
 
 	Dwarf_Unsigned var_length;
 	sign_type_t original_su;

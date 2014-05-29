@@ -113,9 +113,9 @@ int reg_name_to_dwop(Temp * tmp) {
 
 //Given 2 nodes of an edge, check whether this edge is already in this graph g.
 bool check_duplicated_edge(func_vertex_ptr func_list, int src_node, int des_node, Graph &g) {
-	if(func_list->edge_list.count(pair<int, int>(src_node, des_node)) > 0){
+	if (func_list->edge_list.count(pair<int, int>(src_node, des_node)) > 0) {
 		return true;
-	}else{
+	} else {
 		return false;
 	}
 }
@@ -350,7 +350,7 @@ Graph::vertex_descriptor node_searcher(func_vertex_ptr func_list, int block, int
 
 	if (target->exp_type == TEMP) {
 		if (search_reg(func_list, (Tmp_s *) target) == true) {
-			result = func_list->reg_list.at(((Tmp_s *)target)->index)->my_descriptor;
+			result = func_list->reg_list.at(((Tmp_s *) target)->index)->my_descriptor;
 		}
 	} else if (target->exp_type == MEM) {
 		res = search_var(func_list, block, stmt, (Mem *) target);
@@ -400,8 +400,7 @@ bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *bloc
 }
 
 /*Look for the defination of SF*/
-/*Return the corresponding nodes of var/reg/exp in the equation of SF*/
-bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g) {
+/*Return the corresponding nodes of var/reg/exp in the equation of SF*/bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g) {
 	Exp *def;
 	bool result = false;
 	Graph::vertex_descriptor opr_l = -1;
@@ -833,7 +832,7 @@ bool compare_mem(Mem *former, Mem *latter) {
 
 //Compare 2 Exp* that return -1 as descriptor, include:
 //1-mem[] whose corresponding variable node
-//2-constant, which is not included in graoh by default
+//2-constant, which is not included in graph by default
 //3-?????
 bool compare_exp(Exp *former, Exp *latter) {
 	bool result = false;
@@ -849,6 +848,18 @@ bool compare_exp(Exp *former, Exp *latter) {
 		case CONSTANT: {
 			if (((Constant *) former)->val == ((Constant *) latter)->val) {
 				result = true;
+			}
+			break;
+		}
+		case TEMP:{
+			if(is_tmps(former) == false){
+				return false;
+			}else{
+				if(((Tmp_s *)former)->index == ((Tmp_s *)latter)->index){
+					return true;
+				}else{
+					return false;
+				}
 			}
 			break;
 		}
@@ -915,22 +926,91 @@ string get_full_name(dbase *var) {
 
 //check whether it is a movzbl/movsbl
 //set source variable to signed/unsigned, respectively
-void check_movzsbl(func_vertex_ptr func_list, Cast *src, Temp *dst, Graph::vertex_descriptor v_src, Graph &g) {
-	if (src->exp->exp_type == MEM) {
-		Mem *m_src = (Mem *) src->exp;
-		if (m_src->typ < dst->typ) {
-			if (src->cast_type == CAST_SIGNED) {
-				//movsbl -> signed
-				add_edge_with_cap(func_list, func_list->s_des, v_src, MAX_CAP, 0, g);
-			} else if (src->cast_type == CAST_UNSIGNED) {
-				//movzbl -> unsigned
-				add_edge_with_cap(func_list, v_src, func_list->u_des, MAX_CAP, 0, g);
-			} else {
-				//neither
-				//do nothing
+void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tmp_s *dst, Graph::vertex_descriptor v_src, Graph &g) {
+	reg_t typ = REG_32;
+	switch(src->exp->exp_type){
+	case MEM:{
+		typ = ((Mem *) src->exp)->typ;
+		break;
+	}
+	case CAST:{
+		typ = ((Cast *) src->exp)->typ;
+		break;
+	}
+	default:
+		break;
+	}
+
+	if (typ < dst->typ) {
+		if (src->cast_type == CAST_SIGNED) {
+			//movsbl -> signed
+			add_edge_with_cap(func_list, func_list->s_des, v_src, MAX_CAP, 0, g);
+		} else if (src->cast_type == CAST_UNSIGNED) {
+			//movzbl -> unsigned
+
+			/*look for movsbl in next block*/
+			if ((block + 1) < func_list->stmt_block->len) {
+				for (int i = 0; i < func_list->stmt_block->block_list[block + 1]->blen; i++) {
+					Stmt *exp = func_list->stmt_block->block_list[block + 1]->block[i];
+					if (exp->stmt_type != MOVE) {
+						continue;
+					}
+					if (((Move *) exp)->rhs->exp_type != CAST) {
+						continue;
+					}
+					Cast *cast = ((Cast *) ((Move *) exp)->rhs);
+					if(cast->cast_type == CAST_SIGNED){
+						return;
+					}
+				}
 			}
+
+			/*check whether it's cast to a condition*/
+			int current_block = block;
+			int current_stmt = stmt;
+			BinOp *bop;
+			Move *move;
+			Exp *exp;
+			bool result = get_next_stmt(func_list->stmt_block, current_block, current_stmt, &current_block, &current_stmt);
+			while (result != false) {
+				if (func_list->stmt_block->block_list[current_block]->block[current_stmt]->stmt_type != MOVE) {
+					goto next_stmt;
+				}
+				move = ((Move *) func_list->stmt_block->block_list[current_block]->block[current_stmt]);
+				if(is_tmps(move->lhs) == false){
+					goto next_stmt;
+				}
+				if(((Tmp_s *)move->lhs)->name != str_reg[R_ZF]){
+					goto next_stmt;
+				}
+				if(move->rhs->exp_type != BINOP){
+					break;
+				}
+				bop = (BinOp *)move->rhs;
+				if(bop->lhs->exp_type != CAST ||
+						((Cast *)bop->lhs)->exp->exp_type != CAST){
+					break;
+				}
+				exp = ((Cast *)((Cast *)bop->lhs)->exp)->exp;
+				cout<<"[movzsbl]"<<exp->tostring()<<endl;
+				cout<<"[movzsbl]"<<dst->tostring()<<endl;
+				if(compare_exp(exp, dst) == true){
+					return;
+				}else{
+					break;
+				}
+
+				next_stmt:
+				result = get_next_stmt(func_list->stmt_block, current_block, current_stmt, &current_block, &current_stmt);
+			}
+
+			add_edge_with_cap(func_list, v_src, func_list->u_des, MAX_CAP, 0, g);
+		} else {
+			//neither
+			//do nothing
 		}
 	}
+
 }
 
 //Set signed/unsigned of function params and return value according to function name
@@ -970,6 +1050,10 @@ void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, 
 		}
 		case IFUNC_STRCPY: {
 			check_func(vine_ir_block, func_list, block, stmt, "__strcpy_g", g);
+			break;
+		}
+		case IFUNC_STRRCHR: {
+			check_func(vine_ir_block, func_list, block, stmt, "__strrchr_g", g);
 			break;
 		}
 		case IFUNC_STRCSPN: {
@@ -1270,7 +1354,7 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g) {
 	bool res;
 	Graph::vertex_descriptor vtd = -1;
-	if(func_block->node_list.count(exp) > 0){
+	if (func_block->node_list.count(exp) > 0) {
 		return func_block->node_list.at(exp);
 	}
 	switch (exp->exp_type) {
@@ -1393,18 +1477,24 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 
 			/*Push register into vector & graph g, return index in vector*/
 			if (push_register(func_block, (Tmp_s *) exp, g) == true) {
-				vtd = func_block->reg_list.at(((Tmp_s *)exp)->index)->my_descriptor;
+				vtd = func_block->reg_list.at(((Tmp_s *) exp)->index)->my_descriptor;
 			}
 
-			/*check whether it's an variable*/
-			/*If so, add edge between this res and corresponding var*/
 			if (vtd != -1) {
+				/*check whether it's an variable*/
+				/*If so, add edge between this res and corresponding var*/
 				int count;
 				for (count = 0; count < func_block->variable_list.size(); count++) {
 					dvariable *var = func_block->variable_list.at(count)->debug_info;
 					if (var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true) {
-						//cout<<func_block->stmt_block->block_list[block]->block[stmt]->tostring()<<endl;
 						add_edge_with_cap(func_block, vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
+					}
+				}
+
+				/*check whether it contains a pointer*/
+				for (count = 0; count < func_block->ptr_list.getsize(); count++) {
+					if (true == func_block->ptr_list.plist.at(count)->debug_info->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)) {
+						func_block->ptr_list.plist.at(count)->copy_list.push_back((Tmp_s *) exp);
 					}
 				}
 			}
@@ -1451,7 +1541,7 @@ Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stm
 	}
 
 	//if(vtd != -1){
-		func_block->node_list.insert(pair<Exp *, Graph::vertex_descriptor>(exp, vtd));
+	func_block->node_list.insert(pair<Exp *, Graph::vertex_descriptor>(exp, vtd));
 	//}
 	return vtd;
 }
@@ -1479,7 +1569,8 @@ bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int bloc
 		}
 
 		/*Case 1: reg1 = reg2 + offset1*/
-		/*direct access to a single-type array*/
+		/*1. direct access to a single-type array*/
+		/*2. access of a field of a pointed struct*/
 		if (exp->binop_type == PLUS && offset > 0) {
 			if (offset > 0) {
 				int i, j;
@@ -1494,6 +1585,16 @@ bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int bloc
 									return true;
 								}
 							}
+						}
+					}
+				}
+
+				for (i = 0; i < func_block->ptarget_list.size(); i++) {
+					for (j = 0; j < func_block->ptarget_list.at(i)->debug_info_list.size(); j++) {
+						address_t pc = mov->asm_address;
+						if (func_block->ptarget_list.at(i)->debug_info_list.at(j)->cmp_loc(rexp, pc) == true) {
+							add_edge_with_cap(func_block, op, func_block->ptarget_list.at(i)->my_descriptor, 1, 1, g);
+							return true;
 						}
 					}
 				}
@@ -1580,7 +1681,7 @@ bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int bloc
 							//push reg1(=tmp) into array-field variable's copy list
 							Tmp_s *reg2 = ((Tmp_s *) mov->lhs);
 							func_block->variable_list.at(i)->field_copy_list.push_back(reg2);
-							cout << "push " << reg2->tostring() << " to " << func_block->variable_list.at(i)->var_name << endl;
+							//cout << "push " << reg2->tostring() << " to " << func_block->variable_list.at(i)->var_name << endl;
 							return true; //return ture, though no edge has been added
 						}
 					}
@@ -1700,7 +1801,6 @@ bool check_param(Stmt *stmt, int offset) {
 }
 
 /*map type from given DIE to variables in ptarget_list*/
-/*exp is the Mem[] containing a pointer*/
 bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, Exp *exp, Graph &g) {
 	bool result;
 	int i;
@@ -1826,14 +1926,16 @@ bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, fblock_ptr vine_ir_block
 							add_edge_with_cap(func_list, func_list->s_des, pstack.at(j)->my_descriptor, MAX_CAP, 0, g);
 						} else if (sut == UNSIGNED_T) {
 							add_edge_with_cap(func_list, pstack.at(j)->my_descriptor, func_list->u_des, MAX_CAP, 0, g);
+						}else{
+							return false;
 						}
+						pstack.at(j)->libdbg = true;
+						//TODO: make use of this bit while printing out results
 						break;
 					}
 				}
 			}
 
-			print_ptargetlist(ptarget_list);
-			print_ptargetlist(pstack);
 			return true;
 		}
 
@@ -1874,7 +1976,8 @@ bool is_single_ptr(dptr *ptr, dvariable *&ret) {
 		}
 
 		default: {
-			break;
+			return false;
+			//break;
 		}
 		}
 	}
@@ -1977,7 +2080,8 @@ bool get_return_value(fblock_ptr vine_ir_block, int block, int stmt, int *ret_bl
 			Move *move = ((Move *) vine_ir_block->block_list[current_block]->block[current_stmt]);
 			if (is_tmps(move->rhs) == true) {
 				Tmp_s *reg = ((Tmp_s *) move->rhs);
-				if (reg->name == str_reg[R_EAX] && move->lhs->exp_type == MEM) {
+				if (reg->name == str_reg[R_EAX] && (move->lhs->exp_type == MEM || is_tmps(move->lhs) == true)) {
+					//mem[] = eax || reg = eax
 					ret_var = reg;
 					break;
 				}
