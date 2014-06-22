@@ -69,8 +69,9 @@ void draw_box(FILE *fp, struct basic_block ** nodelist, int index){
 void draw_graph(fblock_ptr func_block, int length){
 	FILE *fp;
 	int i;
+	string name = func_block->func->name + "_cfg";
 
-	if((fp = fopen(func_block->func->name.c_str(), "w")) == NULL){
+	if((fp = fopen(name.c_str(), "w")) == NULL){
 		print_error("Fail to creat file/folder");
 		exit(1);
 	}

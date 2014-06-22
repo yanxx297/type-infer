@@ -28,6 +28,9 @@ extern "C" {
 #include <boost/graph/boykov_kolmogorov_max_flow.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
 
+/*sting start with*/
+#include <boost/algorithm/string/predicate.hpp>
+
 /*include libdwarf*/
 #include "dwarf.h"
 #include "libdwarf.h"
@@ -56,6 +59,7 @@ int func_list_len;
 int func_len;
 struct addr_range* text;
 map<int, call_map *> call_table;
+map<string, string> funcname_map;
 set<string> slog;
 
 int s_s, s_u, u_s, u_u, s_un, u_un;
@@ -71,8 +75,8 @@ void turncate(char *name) {
 
 void read_struct_list(string filepath, set<string> &log) {
 	FILE *fp = fopen(filepath.c_str(), "r");
-	if(fp == NULL){
-		cout<<"please move "<<SLOG<<" into current folder"<<endl;
+	if (fp == NULL) {
+		cout << "please move " << SLOG<<" into current folder" << endl;
 		exit(0);
 	}
 	char mystring[100];
@@ -211,7 +215,8 @@ void print_type_infer_result(func_vertex_ptr func_block, const char *progname, b
 	int uun = 0;
 	int uu = 0;
 	for (i = 0; i < func_block->variable_list.size(); i++) {
-		if (libdbgopt == true || (libdbgopt == false && func_block->variable_list.at(i)->debug_info->libdbg == false)) {
+		if ( UNKNOW_T != func_block->variable_list.at(i)->debug_info->original_su
+				&&(libdbgopt == true || (libdbgopt == false && func_block->variable_list.at(i)->debug_info->libdbg == false))) {
 			if (func_block->variable_list.at(i)->infered_su == SIGNED_T) {
 				printf("\t%s: Signed\\", get_full_name(func_block->variable_list.at(i)->debug_info).c_str());
 			} else if (func_block->variable_list.at(i)->infered_su == UNSIGNED_T) {
@@ -287,7 +292,8 @@ void print_type_infer_result(func_vertex_ptr func_block, const char *progname, b
 
 	for (i = 0; i < func_block->ptarget_list.size(); i++) {
 		for (j = 0; j < func_block->ptarget_list.at(i)->debug_info_list.size(); j++) {
-			if(libdbgopt == true || (libdbgopt == false && func_block->ptarget_list.at(i)->debug_info_list.at(j)->libdbg == false)){
+			if (UNKNOW_T != func_block->ptarget_list.at(i)->debug_info_list.at(0)->original_su
+					&&(libdbgopt == true || (libdbgopt == false && func_block->ptarget_list.at(i)->debug_info_list.at(j)->libdbg == false))) {
 				if (func_block->ptarget_list.at(i)->infered_su == SIGNED_T) {
 					printf("\t%s: Signed\\", get_full_name(func_block->ptarget_list.at(i)->debug_info_list.at(j)).c_str());
 				} else if (func_block->ptarget_list.at(i)->infered_su == UNSIGNED_T) {
@@ -585,10 +591,13 @@ void push_each_var(dvariable *var, func_vertex_ptr func_list, Graph& g) {
 }
 
 //For a given dbase *, check whether it's parent is a structure defined in libc
-bool is_libc_struct(dbase *var){
+bool is_libc_struct(dbase *var) {
 	dvariable *buf = var->parent;
-	while(buf != 0){
-		if(buf->var_struct_type == DVAR_STRUCT && slog.count(buf->type_name) > 0){
+	while (buf != 0) {
+		if (buf->var_struct_type == DVAR_STRUCT
+				&& slog.count(buf->type_name) > 0
+				&& (boost::starts_with(((dstruct *) buf)->decl_file, "/usr/lib/gcc/") || boost::starts_with(((dstruct *) buf)->decl_file, "/usr/include/")))
+		{
 			return true;
 		}
 		buf = buf->parent;
@@ -620,7 +629,7 @@ void push_variable(subprogram *prog, func_vertex_ptr func_list, Graph& g) {
 	}
 
 	for (j = 0; j < func_list->ptarget_list.size(); j++) {
-		for(int i = 0; i < func_list->ptarget_list.at(j)->debug_info_list.size(); i++){
+		for (int i = 0; i < func_list->ptarget_list.at(j)->debug_info_list.size(); i++) {
 			if (true == is_libc_struct(func_list->ptarget_list.at(j)->debug_info_list.at(i))) {
 				func_list->ptarget_list.at(j)->debug_info_list.at(i)->libdbg = true;
 			}
@@ -680,7 +689,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g) {
 									if (it->second->addr == addr) {
 										string str = it->second->func_name;
 										cout << "######call " << str << endl;
-										check_call(vine_ir_block, func_list, j, k, str, g);
+										check_call(vine_ir_block, func_list, funcname_map, j, k, str, g);
 									}
 								}
 							}
@@ -766,14 +775,14 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g) {
 
 }
 
-void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, bool ssaf, bool rmvf, bool libdbg) {
+void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, program * dinfo, int func_num, bool ssaf, bool rmvf, bool libdbg, bool pdvar) {
 	int i, j, k;
 	fblock_ptr tmp;
 	tmp = transform_to_ssa(vine_blocks, prog, func_num, text);
 	if (tmp->len == 0) {
-		//cout<<"Empty function block"<<endl;
 		return;
 	}
+
 	printf("SSA tranformation of Vine IR ----OK\n");
 
 	//Replace all Temp variables on the right side
@@ -830,6 +839,9 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 		return;
 	}
 
+	if (pdvar == true) {
+		dinfo->func_list.at(i)->print_subprogram();
+	}
 	func_list->stmt_block = tmp;
 	push_variable(dinfo->func_list.at(i), func_list, g);
 
@@ -917,7 +929,7 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 //	End of debug tools
 
 	//Display pointed info
-	//func_list->ptr_list.print_copylists();
+	func_list->ptr_list.print_copylists();
 	//draw_var_undigraph(func_list[i], new_graph, ds);
 
 	printf("Draw graph[%d] <%s>\n", func_num, func_list->func_name.c_str());
@@ -936,6 +948,73 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 
 	/*Deallocate memory*/
 	delete func_list;
+}
+
+/*Initialize a hardcoded map which map an input function name to a
+ * corresponding function in libc dbg info*/
+void init_func_map(map<string, string> &funcname){
+	funcname["strcat"] = "__strcat_g";
+	funcname["strchr"] = "__strchr_g";
+	funcname["strcmp"] = "__strcmp_gg";
+	funcname["strcpy"] = "__strcpy_g";
+	funcname["strrchr"] = "__strrchr_g";
+	funcname["strcspn"] = "__strcspn_g";
+	funcname["strlen"] = "__strlen_g";
+	funcname["strnlen"] = "__strnlen_ia32";
+	funcname["strncat"] = "__strncat_g";
+	funcname["strncmp"] = "__strncmp_g";
+	funcname["strncpy"] = "__strncpy_gg";
+	funcname["strrchr"] = "__strrchr_g";
+	funcname["strpbrk"] = "__strpbrk_g";
+	funcname["strspn"] = "__strspn_g";
+	funcname["memchr"] = "__memset_gcn_by4";
+	funcname["memset"] = "__memset_gcn_by4";
+	funcname["memcpy"] = "__memcpy_g";
+	funcname["stpcpy"] = "__stpcpy_g";
+	funcname["strncpy"] = "__strncpy_gg";
+	funcname["strcasecmp"] = "__strcasecmp_nonascii";
+	funcname["strncasecmp"] = "__strcasecmp_l_nonascii";
+	funcname["memcpy"] = "__memcpy_g";
+	funcname["rawmemchr"] = "__memset_gcn_by4";
+	funcname["memrchr"] = "__memrchr_ia32";
+	funcname["strstr"] = "__strstr_g";
+	funcname["strcasestr"] = "__strcasestr_ia32";
+	funcname["wcschr"] = "__wcschr_ia32";
+	funcname["wcscmp"] = "__wcscmp_ia32";
+	funcname["wcscpy"] = "__wcscpy_ia32";
+	funcname["wcslen"] = "__wcslen_ia32";
+	funcname["wcsrchr"] = "__wcsrchr_ia32";
+	funcname["wmemcmp"] = "__wmemcmp_ia32";
+	funcname["fgetc"] = "getc";
+	funcname["fgetc_unlocked"] = "getc_unlocked";
+	funcname["fgetwc"] = "getwc";
+	funcname["fgetwc_unlocked"] = "getwc_unlocked";
+	funcname["ffsl"] = "ffs";
+	funcname["wcswcs"] = "wcsstr";
+	funcname["wcstoq"] = "wcstoll";
+	funcname["wcstouq"] = "wcstoull";
+	funcname["timelocal"] = "mktime";
+	funcname["lseek64"] = "llseek";
+	funcname["getutmpx"] = "getutmp";
+	funcname["imaxdiv"] = "lldiv";
+	funcname["imaxabs"] = "llabs";
+	funcname["srand"] = "srandom";
+	funcname["bcmp"] = "";
+	funcname["memmove"] = "";
+	funcname["bcopy"] = "";
+	funcname["bzero"] = "";
+	funcname["scalbln"] = "";
+	funcname["scalbn"] = "";
+	funcname["scalblnf"] = "";
+	funcname["scalbnf"] = "";
+	funcname["scalblnl"] = "";
+	funcname["scalbnl"] = "";
+	funcname["ntohl"] = "";
+	funcname["htonl"] = "";
+	funcname["ntohs"] = "";
+	funcname["htons"] = "";
+	funcname["ntp_adjtime"] = "";
+	funcname["adjtimex"] = "";
 }
 
 int main(int argc, char **argv) {
@@ -961,8 +1040,13 @@ int main(int argc, char **argv) {
 	filepath = argv[1];
 
 	//---------------------------------------------------------------------------------X
+	//INITIALIZATION
+
 	//struct log
 	read_struct_list(SLOG, slog);
+
+	//Function name map
+	init_func_map(funcname_map);
 	//---------------------------------------------------------------------------------X
 	//ELF file header
 	text = new struct addr_range();
@@ -986,7 +1070,6 @@ int main(int argc, char **argv) {
 	}
 
 	program * prog = new program(dbg);
-	//prog->print_program();
 	res = dwarf_finish(dbg, &error);
 	if (res != DW_DLV_OK) {
 		printf("dwarf_finish failed!\n");
@@ -1000,8 +1083,16 @@ int main(int argc, char **argv) {
 	trans_to_vineir(argv[1], vine_blocks, asmprog);
 	int func_num = -1;
 	bool ssaf_flag = false;
+	bool pdvar_flag = false;
 	bool rmv_flag = false;
 	bool libdbg_flag = false;
+
+	for (count = 0; count < argc; count++) {
+		if (strcmp(argv[count], "-pdvar") == 0) {
+			pdvar_flag = true;
+			break;
+		}
+	}
 
 	for (count = 0; count < argc; count++) {
 		if (strcmp(argv[count], "-single") == 0 && (count + 1) < argc) {
@@ -1035,12 +1126,12 @@ int main(int argc, char **argv) {
 		/*handle all functions*/
 		int vineIR_func_num = vine_blocks.size();
 		for (i = 0; i < vineIR_func_num; i++) {
-			handle_function(vine_blocks, asmprog, prog, i, ssaf_flag, rmv_flag, libdbg_flag);
+			handle_function(vine_blocks, asmprog, prog, i, ssaf_flag, rmv_flag, libdbg_flag, pdvar_flag);
 		}
 
 	} else {
 		/*handle a signle function*/
-		handle_function(vine_blocks, asmprog, prog, func_num, ssaf_flag, rmv_flag, libdbg_flag);
+		handle_function(vine_blocks, asmprog, prog, func_num, ssaf_flag, rmv_flag, libdbg_flag, pdvar_flag);
 	}
 
 	// print overall inference result

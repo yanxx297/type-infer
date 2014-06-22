@@ -6,7 +6,8 @@ using namespace std;
 class dvariable{
 public:
 	dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> frame_base);
-	dvariable(dvariable &source);//copy from source
+	dvariable(const dvariable &source);//copy from source
+	dvariable(){};
 	void print_dvar();
 	virtual void print_me(){};
 	bool cmp_type(dvariable *input);
@@ -33,26 +34,30 @@ public:
 class dbase: public dvariable{
 public:
 	dbase(dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent);
+	dbase(const dbase &source);
 	void print_me();
-	bool libdbg;	//whether this variable is "infered" directly from libc
 
-	Dwarf_Unsigned var_length;
+	bool libdbg;	//whether this variable is "infered" directly from libc
+	Dwarf_Unsigned var_length;	//length in byte
 	sign_type_t original_su;
 	//sign_type_t infered_su;
 };
 
 class dstruct: public dvariable{
 public:
-	dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent);
+	dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string> src_list, dvariable *parent);
+	dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, set<dvariable *> member_list, map<int, string> src_list, dvariable *parent);
 	void print_me();
 
 	Dwarf_Unsigned struct_length;
 	vector<dvariable *> member_list;
+	string decl_file;	//Name of the file declaring this structure
 };
 
 class darray: public dvariable{
 public:
-	darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent);
+	darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string>src_list, dvariable *parent);
+	darray(dvariable &source, dvariable *var, int size);
 	void print_me();
 
 	int array_size;
@@ -61,7 +66,7 @@ public:
 
 class dptr: public dvariable{
 public:
-	dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent);
+	dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string>src_list, dvariable *parent);
 	void print_me();
 	bool cmp_ptr_type(dptr *input);
 
@@ -71,7 +76,7 @@ public:
 
 class subprogram{
 public:
-	subprogram(Dwarf_Debug dbg, Dwarf_Die die_subprog);
+	subprogram(Dwarf_Debug dbg, Dwarf_Die die_subprog, map<int, string> src_list);
 	void print_subprogram();
 
 	vector<dvariable *> var_list;

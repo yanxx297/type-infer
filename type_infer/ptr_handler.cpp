@@ -195,7 +195,6 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 	address_t pc = exp->asm_address;
 	Tmp_s * reg1 = 0;
 	Tmp_s * reg2 = 0;
-	int type = 0; //type 1 or 2
 	int cons = -1;
 	if(is_tmps(exp->lhs) == true){
 		reg1 = (Tmp_s *)exp->lhs;
@@ -204,100 +203,101 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 			BinOp * binop = (BinOp *)exp->rhs;
 			if(is_tmps(binop->lhs) == true && binop->rhs->exp_type == MEM){
 				/*reg1 = reg0 + mem[reg2 (+ cons)]*/
-				type = 1;
 				mem = (Mem *)binop->rhs;
 			}else if(is_tmps(binop->rhs) == true && binop->lhs->exp_type == MEM){
 				/*reg1 = mem[reg2 (+ cons)] + reg0*/
-				type = 1;
 				mem = (Mem *)binop->lhs;
-			}else if(is_tmps(binop->lhs) == true && binop->rhs->exp_type == CONSTANT){
-				/*reg1 = reg2 + cons*/
-				type = 2;
-				reg2 = (Tmp_s *)binop->lhs;
-				cons = ((Constant *)binop->rhs)->val;
-			}else if(is_tmps(binop->rhs) == true && binop->lhs->exp_type == CONSTANT){
-				/*reg1 = cons + reg2 */
-				type = 2;
-				reg2 = (Tmp_s *)binop->rhs;
-				cons = ((Constant *)binop->lhs)->val;
+			}else{
+				return;
 			}
 		}else if(exp->rhs->exp_type == MEM){
 			/* reg1 = mem[reg2 (+ cons)]*/
-			type = 1;
 			mem = (Mem *)exp->rhs;
 		}else{
 			return;
 		}
 
-		if(type == 1){
-			if(mem->addr->exp_type == BINOP ){
-				BinOp *addr = (BinOp *)mem->addr;
-				if(is_tmps(addr->lhs) == true && addr->rhs->exp_type == CONSTANT){
-					reg2 = (Tmp_s *)addr->lhs;
-					cons = ((Constant *)addr->rhs)->val;
-				}else if(is_tmps(addr->rhs) == true && addr->lhs->exp_type == CONSTANT){
-					reg2 = (Tmp_s *)addr->rhs;
-					cons = ((Constant *)addr->lhs)->val;
-				}
-			}else if(is_tmps(mem->addr)){
-				reg2 = (Tmp_s *)mem->addr;
-				cons = 0;
-			}
 
-			if(reg2 == 0 || cons == -1){
+		if(mem->addr->exp_type == BINOP ){
+			BinOp *addr = (BinOp *)mem->addr;
+			if(is_tmps(addr->lhs) == true && addr->rhs->exp_type == CONSTANT){
+				reg2 = (Tmp_s *)addr->lhs;
+				cons = ((Constant *)addr->rhs)->val;
+			}else if(is_tmps(addr->rhs) == true && addr->lhs->exp_type == CONSTANT){
+				reg2 = (Tmp_s *)addr->rhs;
+				cons = ((Constant *)addr->lhs)->val;
+			}
+		}else if(is_tmps(mem->addr)){
+			reg2 = (Tmp_s *)mem->addr;
+			cons = 0;
+		}
+
+		if(reg2 == 0 || cons == -1){
+			return;
+		}
+
+		/*parameter got!*/
+		/*begin checking*/
+		for(i = 0; i < func_block->ptr_list.getsize(); i++){
+			dptr * ptr = func_block->ptr_list.plist.at(i)->debug_info;
+			if(ptr->cmp_loc(mem->addr, pc) == true){
+				func_block->ptr_list.plist.at(i)->copy_list.push_back(reg1);
 				return;
-			}
-
-			/*parameter got!*/
-			/*begin checking*/
-
-			for(i = 0; i < func_block->ptr_list.getsize(); i++){
-				dptr * ptr = func_block->ptr_list.plist.at(i)->debug_info;
-				if(ptr->cmp_loc(mem->addr, pc) == true){
-					func_block->ptr_list.plist.at(i)->copy_list.push_back(reg1);
-					return;
-				}else{
-					for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
-						if(reg2->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
-							for(k = 0; k < func_block->ptr_list.plist.at(i)->child_list.size(); k++){
-								pointer_info * child = func_block->ptr_list.plist.at(i)->child_list.at(k);
-								bool cmp_res = cmp_offset(cons, child->debug_info);
-								if(cmp_res == true){
-									child->copy_list.push_back(reg1);
-									return;
-								}
+			}else{
+				for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
+					if(reg2->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
+						for(k = 0; k < func_block->ptr_list.plist.at(i)->child_list.size(); k++){
+							pointer_info * child = func_block->ptr_list.plist.at(i)->child_list.at(k);
+							bool cmp_res = cmp_offset(cons, child->debug_info);
+							if(cmp_res == true){
+								child->copy_list.push_back(reg1);
+								return;
 							}
 						}
 					}
 				}
 			}
+		}
 
-		}else if(type == 2){
-			if(reg2 == 0){
-				return;
-			}
 
-			for(i = 0; i < func_block->ptr_list.getsize(); i++){
-				for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
-					if(reg2->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
-						func_block->ptr_list.plist.at(i)->copy_list.push_back(reg1);
-						return;
-					}
+	}
+};
+
+int ptr_node_lookup(func_vertex_ptr func_block, dptr * parent_ptr, int offset){
+	int k, w;
+	for(k = 0; k < func_block->ptarget_list.size(); k++){
+		for(w = 0; w < func_block->ptarget_list.at(k)->debug_info_list.size(); w++){
+			dbase *child = func_block->ptarget_list.at(k)->debug_info_list.at(w);
+			if(check_direct_child(parent_ptr, child) == true){
+				bool res = cmp_offset(offset, child);
+				if(res == true){
+					return func_block->ptarget_list.at(k)->my_descriptor;
 				}
 			}
 		}
 	}
-};
+
+	/*check linklist*/
+	for(k = 0; k < func_block->variable_list.size(); k++){
+		if(check_child_from_parent(parent_ptr, func_block->variable_list.at(k)->debug_info) == true){
+			bool res = cmp_offset(offset, func_block->variable_list.at(k)->debug_info);
+			if(res == true){
+				return func_block->variable_list.at(k)->my_descriptor;
+			}
+		}
+	}
+
+	return -1;
+}
 
 //check whether a memory access corresponse to a pointed target (ptarget)
-int ptarget_lookup(func_vertex_ptr func_block, Mem *exp, int block, int stmt){
-	int result = -1;
+int ptarget_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
 	int i, j, k, w;
 	Tmp_s *reg = 0;
 	int cons = -1;
 
-	if(exp->addr->exp_type == BINOP){
-		BinOp *addr = (BinOp *)exp->addr;
+	if(exp->exp_type == BINOP){
+		BinOp *addr = (BinOp *)exp;
 		if(is_tmps(addr->lhs) == true && addr->rhs->exp_type == CONSTANT){
 			reg = (Tmp_s *)addr->lhs;
 			cons = ((Constant *)addr->rhs)->val;
@@ -305,47 +305,36 @@ int ptarget_lookup(func_vertex_ptr func_block, Mem *exp, int block, int stmt){
 			reg = (Tmp_s *)addr->rhs;
 			cons = ((Constant *)addr->lhs)->val;
 		}
-	}else if(is_tmps(exp->addr) == true){
-		reg = (Tmp_s *)exp->addr;
+	}else if(is_tmps(exp) == true){
+		reg = (Tmp_s *)exp;
 		cons = 0;
 	}
 
 	if(reg == 0 || cons == -1){
-		return result;
+		return -1;
 	}
 
+	dptr * parent_ptr = 0;
 	for(i = 0; i < func_block->ptr_list.getsize(); i++){
-		for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
-			if(reg->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
-				dptr * parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
-				for(k = 0; k < func_block->ptarget_list.size(); k++){
-					for(w = 0; w < func_block->ptarget_list.at(k)->debug_info_list.size(); w++){
-						dbase *child = func_block->ptarget_list.at(k)->debug_info_list.at(w);
-						if(check_child(parent_ptr, child) == true){
-							bool res = cmp_offset(cons, child);
-							if(res == true){
-								result = func_block->ptarget_list.at(k)->my_descriptor;
-								return result;
-							}
-						}
-					}
+		if(true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(reg, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)){
+			parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
+		}else{
+			for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
+				if(reg->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
+					parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
+					break;
 				}
+			}
+		}
 
-				/*check linklist*/
-				for(k = 0; k < func_block->variable_list.size(); k++){
-					if(check_child_from_parent(parent_ptr, func_block->variable_list.at(k)->debug_info) == true){
-						bool res = cmp_offset(cons, func_block->variable_list.at(k)->debug_info);
-						if(res == true){
-							result = func_block->variable_list.at(k)->my_descriptor;
-							return result;
-						}
-					}
-				}
-
+		if(parent_ptr != 0){
+			int vtd = ptr_node_lookup(func_block, parent_ptr, cons);
+			if(vtd != -1){
+				return vtd;
 			}
 		}
 	}
 
-	return result;
+	return -1;
 }
 

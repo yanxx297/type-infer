@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <boost/utility.hpp>	//boost::next(iterator)
 
 /*include Vine*/
 #include "asm_program.h"
@@ -13,6 +14,8 @@ extern "C"
 #include "libdwarf.h"
 
 #include<vector>
+#include<set>
+#include <limits>
 
 #include "type_common.h"
 #include "location.h"
@@ -138,6 +141,54 @@ bool get_die_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret, Dwarf_Off *ret
 
 	*ret = typeDie;
 	*ret_off = offset;
+	return true;
+}
+
+/*Given a CU die, return its source file list*/
+bool get_file_list(Dwarf_Debug dbg, Dwarf_Die die, map<int, string> &src_list){
+	int i;
+	Dwarf_Signed cnt;
+	Dwarf_Error error;
+	char **srcfiles;
+	int res;
+	res = dwarf_srcfiles(die, &srcfiles, &cnt, &error);
+	if (res == DW_DLV_OK) {
+		for (i = 0; i < cnt; ++i) {
+			src_list.insert(pair<int, string>(i, string(srcfiles[i])));
+		}
+		dwarf_dealloc(dbg, srcfiles, DW_DLA_LIST);
+
+//		for(map<int, string>::iterator it = src_list.begin(); it != src_list.end(); it ++){
+//			cout<<"<src_file>["<<it->first<<"] "<<it->second<<endl;
+//		}
+		return true;
+	}else{
+		return false;
+	}
+}
+
+bool get_die_file_number(Dwarf_Die typeDie, unsigned *ret){
+	bool result = false;
+	int res;
+	Dwarf_Unsigned fnumber;
+	Dwarf_Attribute attr;
+	Dwarf_Error error;
+
+	*ret = 0;
+
+	res = dwarf_attr(typeDie, DW_AT_decl_file, &attr, &error);
+	if (res != DW_DLV_OK) {
+		perror("get_die_su(): var has no s/u attr");
+		return false;
+	}
+	res = dwarf_formudata(attr, &fnumber, &error);
+	if (res != DW_DLV_OK || fnumber == 0) {
+		/*number is 0 if source file info is unavaliable*/
+		perror("fail to get the value of s/u attr");
+		return false;
+	}
+
+	*ret = fnumber;
 	return true;
 }
 
@@ -657,6 +708,11 @@ bool cmp_offset_loc(string regname, int offset, address_t pc, dvariable *var){
 				/*get var type*/
 				int small_off = offset - loc->offset;
 				if(small_off >= 0){
+					/*The inside offset of a pointer can only be zero, in order to*/
+					/*distinguish mem[ebp+8]+4 from mem[ebp+12]*/
+					if(var->var_struct_type == DVAR_POINTER && small_off != 0){
+						return false;
+					}
 					if(loc->reg_name == regname && cmp_offset(small_off, var) == true){
 						result = true;
 						break;
@@ -775,7 +831,7 @@ int handle_constant(unsigned long long offset){
 	return tmp_off;
 }
 
-void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariable *> &var_list, vector<location *> &frame_base){
+void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariable *> &var_list, map<int, string> src_list, vector<location *> &frame_base){
 	int res = 0;
 	bool result = false;
 	Dwarf_Die cur_die = 0;
@@ -805,17 +861,22 @@ void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariabl
 					break;
 				}
 				case DW_TAG_structure_type:{
-					dstruct * member = new dstruct(dbg, *source, die_type_cur, off_type_cur, 0, (dvariable *)0);
+					dstruct * member = new dstruct(dbg, *source, die_type_cur, off_type_cur, 0, src_list, (dvariable *)0);
 					var_list.push_back(member);
 					break;
 				}
 				case DW_TAG_array_type:{
-					darray * member = new darray(dbg, *source, die_type_cur, off_type_cur, 0, (dvariable *)0);
+					darray * member = new darray(dbg, *source, die_type_cur, off_type_cur, 0, src_list, (dvariable *)0);
 					var_list.push_back(member);
 					break;
 				}
 				case DW_TAG_pointer_type:{
-					dptr * member = new dptr(dbg, *source, die_type_cur, off_type_cur, 0, (dvariable *)0);
+					dptr * member = new dptr(dbg, *source, die_type_cur, off_type_cur, 0, src_list, (dvariable *)0);
+					var_list.push_back(member);
+					break;
+				}
+				case DW_TAG_union_type:{
+					dstruct * member = handle_union(dbg, *source, die_type_cur, off_type_cur, 0, src_list, (dvariable *)0);
 					var_list.push_back(member);
 					break;
 				}
@@ -827,7 +888,7 @@ void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariabl
 			break;
 		}
 		default:{
-			handle_child_and_sibling(dbg, cur_die, var_list, frame_base);
+			handle_child_and_sibling(dbg, cur_die, var_list, src_list, frame_base);
 			break;
 		}
 		}
@@ -840,8 +901,9 @@ void handle_child_and_sibling(Dwarf_Debug dbg, Dwarf_Die in_die, vector<dvariabl
 //==========================================================================================X
 //Functions that combine above functions for more specific aims
 
-//return the s/u type of die directly, instead of return s/u from a type Die
-bool get_su(Dwarf_Debug dbg, Dwarf_Die die, sign_type_t *ret){
+//return type if die is a base, and
+//return the base/struct/array pointed by die if its a pointer
+bool get_original_type(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Die *ret){
 	bool result;
 	Dwarf_Off type_off;
 	Dwarf_Die type_die = die;
@@ -858,14 +920,7 @@ bool get_su(Dwarf_Debug dbg, Dwarf_Die die, sign_type_t *ret){
 			return false;
 		}
 	}while(tag == DW_TAG_pointer_type);
-
-	result = get_die_su(type_die, &su_ret);
-	if(result == true){
-		*ret = su_ret;
-	}else{
-		return false;
-	}
-
+	*ret = type_die;
 	return true;
 }
 
@@ -896,4 +951,260 @@ bool get_length(Dwarf_Debug dbg, Dwarf_Die die, int *ret){
 	}
 
 	return false;
+}
+
+/*Given a variable, calculate its length*/
+int calc_len(dvariable *dvar){
+	int res;
+	switch(dvar->var_struct_type){
+	case DVAR_BASE:{
+		res = ((dbase *)dvar)->var_length;
+		break;
+	}
+	case DVAR_STRUCT:{
+		res = ((dstruct *)dvar)->struct_length;
+		break;
+	}
+	case DVAR_ARRAY:{
+		darray *arr = (darray *)dvar;
+		res = arr->array_size * calc_len(arr->var);
+		break;
+	}
+	default:{
+		break;
+	}
+	}
+
+	return res;
+}
+
+/*check each dbase* in dvar, get both the dbase and corresponding offset, recursively*/
+void check_union_fields(dvariable *dvar, int offset, map<int, set<dbase *> > &field_list){
+	if(dvar == 0){
+		return;
+	}
+	switch(dvar->var_struct_type){
+	case DVAR_ARRAY:{
+		darray *arr = (darray *)dvar;
+		if(arr->leaf == true)
+			break;
+		int len = calc_len(arr->var);
+		for(int i = 0; i < arr->array_size; i++){
+			check_union_fields(((darray *)dvar)->var, (offset+(i*len)), field_list);
+		}
+		break;
+	}
+	case DVAR_POINTER:
+		/*the existence of a pointer indicates that this field should be entirely ignored*/
+		/*set its offset to the minimum value of int, so that a pointer's offset is negative under most situations*/
+	{
+		if(dvar->leaf == true){
+			break;
+		}
+		check_union_fields(((dptr *)dvar)->var, numeric_limits<int>::min(), field_list);
+		break;
+	}
+	case DVAR_BASE:{
+		if(field_list.count(offset) > 0){
+			field_list.at(offset).insert((dbase *)dvar);
+		}else{
+			set<dbase *> list;
+			list.insert((dbase *)dvar);
+			field_list.insert(pair<int, set<dbase *> >(offset, list));
+		}
+		break;
+	}
+	case DVAR_STRUCT:{
+		dstruct * tmp = (dstruct *)dvar;
+		if(tmp->leaf == true)
+			break;
+		for(int i = 0; i < tmp->member_list.size(); i++){
+			check_union_fields(tmp->member_list.at(i), (offset + tmp->member_list.at(i)->s_offset), field_list);
+		}
+		break;
+	}
+	default:{
+		break;
+	}
+	}
+}
+
+/*handle each union member*/
+void handle_union_member(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, map<int, string> src_list, vector<dvariable *> &var_list){
+	Dwarf_Half type_tag = 0;
+	get_die_tag(die_type, &type_tag);
+	switch(type_tag){
+	case DW_TAG_base_type:{
+		dbase * member = new dbase(source, die_type, off_type, 0, (dvariable *)0);
+		var_list.push_back(member);
+		break;
+	}
+	case DW_TAG_structure_type:{
+		dstruct * member = new dstruct(dbg, source, die_type, off_type, 0, src_list, (dvariable *)0);
+		var_list.push_back(member);
+		break;
+	}
+	case DW_TAG_array_type:{
+		darray * member = new darray(dbg, source, die_type, off_type, 0, src_list, (dvariable *)0);
+		var_list.push_back(member);
+		break;
+	}
+	case DW_TAG_pointer_type:{
+		dptr * member = new dptr(dbg, source, die_type, off_type, 0, src_list, (dvariable *)0);
+		var_list.push_back(member);
+		break;
+	}
+	/*FIXME:Union in union is ignored*/
+	default:{
+		break;
+	}
+	}
+}
+
+dstruct *handle_union(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string> src_list, dvariable *parent){
+	int res, i;
+	bool result = false;
+	Dwarf_Error error = 0;
+	Dwarf_Die die_member = 0;
+	set<int> offset_list;
+	vector<dvariable *> var_list;
+	map<int, set<dbase *> > field_list;
+
+	res = dwarf_child(die_type, &die_member, &error);
+	while(res == DW_DLV_OK){
+		/*get name of this member, and reset the name of source*/
+		string name;
+		result = get_die_name(dbg, die_member, name);
+		dvariable *src = new dvariable(source);
+		src->var_name = name;
+
+		/*get type of this member*/
+		Dwarf_Off off_type = 0;
+		Dwarf_Die current_die_type = 0;
+		result = get_die_type(dbg, die_member, &current_die_type, &off_type);
+
+		/*Get corresponding dvariable * of this member*/
+		handle_union_member(dbg, *src, current_die_type, off_type, src_list, var_list);
+
+		/*get next member*/
+		res = dwarf_siblingof(dbg, die_member, &die_member, &error);
+	}
+
+	/*check each member's dvar to get the offset of each field*/
+	for(i = 0; i < var_list.size(); i++){
+		check_union_fields(var_list.at(i), 0, field_list);
+	}
+
+	/*decide the exactly field accessed by each possible offset*/
+	map<int, set<dbase *> >::iterator it;
+
+	set<int> field_delete_list;	/*a list of indexes that should be delete from field_list*/
+	for(it = field_list.begin(); it != field_list.end(); it++){
+		if(it->first < 0){
+			field_delete_list.insert(it->first);
+			continue;
+		}
+		sign_type_t signedness;
+		if(it->second.size() > 1){
+			/*check signedness, push this location into delete list if not all of them share the same signedness*/
+			set<dbase *>::iterator sit = it->second.begin();
+			signedness = (*sit)->original_su;
+			sit ++;
+			for(; sit != it->second.end(); sit ++){
+				if((*sit)->original_su != signedness){
+					field_delete_list.insert(it->first);
+					break;
+				}
+			}
+
+			/*remove all variables with duplicated length*/
+			if(field_delete_list.count(it->first) == 0){
+				set<int> size_list;	/*a list of lengths of variables with the same offset*/
+				set<dbase *> dvar_delete_list;
+				for(sit = it->second.begin(); sit != it->second.end(); sit ++){
+					if(size_list.count((*sit)->var_length) > 0){
+						dvar_delete_list.insert(*sit);
+					}else{
+						size_list.insert((*sit)->var_length);
+					}
+				}
+
+				/*remove all dvariables*/
+				for(sit = dvar_delete_list.begin(); sit != dvar_delete_list.end(); sit ++){
+					it->second.erase(*sit);
+				}
+			}
+		}
+	}
+
+	/*remove those locations who has different signedness*/
+	set<int>::iterator iit;
+	for(iit = field_delete_list.begin(); iit != field_delete_list.end(); iit ++){
+		field_list.erase(*iit);
+	}
+
+
+//	for(it = field_list.begin(); it != field_list.end(); it ++){
+//		cout<<"off = "<<it->first<<endl;
+//		for(set<dbase *>::iterator sit = it->second.begin(); sit != it->second.end(); sit ++){
+//			cout<<"  "<<(*sit)->var_name<<endl;
+//		}
+//	}
+
+	/*move all fields left in field_list to a new set<dbase *>*/
+	set<dvariable *> res_field_list;
+	for(it = field_list.begin(); it != field_list.end(); it ++){
+		for(set<dbase *>::iterator sit = it->second.begin(); sit != it->second.end(); sit ++){
+			bool flag = false;
+			dbase *member = new dbase(**sit);
+
+			/*check whether its the beginning of a new array*/
+			/*create a new array if this dbase is the same as next one*/
+			for(set<dbase *>::iterator sit_next = boost::next(it)->second.begin(); sit_next != boost::next(it)->second.end(); sit_next ++){
+				/*the last var in field_list doesn't have a next*/
+				if(it == boost::prior(field_list.end())){
+					break;
+				}
+
+				if(member->var_name == (*sit_next)->var_name
+						&& member->var_type == (*sit_next)->var_type
+						&& (member->var_length + it->first) == boost::next(it)->first){
+					string name;
+					result = get_die_name(dbg, die_member, name);
+					dvariable *src = new dvariable(source);
+					src->var_name = name;
+					darray *arr = new darray(*src, member, 1);
+					res_field_list.insert(arr);
+					flag = true;
+					break;
+				}
+			}
+
+			/*check whether this variable belong to an array*/
+			if(flag == false){
+				for(set<dvariable *>::iterator dit = res_field_list.begin(); dit != res_field_list.end(); dit ++){
+					if((*dit)->var_struct_type != DVAR_ARRAY){
+						continue;
+					}
+					darray *arr = (darray *)(*dit);
+					if(arr->var->var_name == member->var_name
+							&& arr->var->var_type == member->var_type){
+						arr->array_size ++;
+						flag = true;
+						break;
+					}
+				}
+			}
+
+			/*It's not a array but a single variable*/
+			if(flag == false){
+				member->s_offset = it->first;
+				res_field_list.insert(member);
+			}
+		}
+	}
+
+	/*Create a new struct using all fields in field_list*/
+	dstruct *struct_union = new dstruct(dbg, source, die_type, off_type, 0, res_field_list, src_list, parent);
+	return struct_union;
 }

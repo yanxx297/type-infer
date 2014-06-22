@@ -45,7 +45,7 @@ dvariable::dvariable(Dwarf_Debug dbg, Dwarf_Die die_var, vector<location *> fram
 	get_die_loclist(dbg, die_var, this->loclist, frame_base);
 }
 
-dvariable::dvariable(dvariable &source){
+dvariable::dvariable(const dvariable &source){
 	int i;
 
 	this->var_name = source.var_name;
@@ -258,6 +258,33 @@ dbase::dbase(dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int memb
 
 }
 
+dbase::dbase(const dbase &source)
+{
+	int i;
+
+	/*copy dvariable*/
+	this->var_name = source.var_name;
+	this->var_type = source.var_type;
+	this->s_offset = source.s_offset;
+	this->var_struct_type = source.var_struct_type;
+	this->parent = source.parent;
+
+	if(source.leaf == false){
+		this->leaf = false;
+	}else{
+		this->leaf = true;
+	}
+
+	for(i = 0; i < source.loclist.size(); i++){
+		this->loclist.push_back(source.loclist.at(i));
+	}
+
+	/*copy dbase*/
+	this->libdbg = source.libdbg;
+	this->var_length = source.var_length;
+	this->original_su = source.original_su;
+}
+
 void dbase::print_me(){
 	cout<<"*************************"<<endl;
 	this->print_dvar();
@@ -273,13 +300,14 @@ void dbase::print_me(){
 }
 
 
-dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
+dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string> src_list, dvariable *parent)
 :dvariable(source)
 {
 	int res;
 	bool res_b;
 	int i, j;
 	int size = 0;
+	unsigned fnumber = 0;
 	Dwarf_Die die_member = 0;
 	Dwarf_Half tag_member = 0;
 	Dwarf_Error error = 0;
@@ -297,6 +325,20 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 	/*type name*/
 	get_die_name(dbg, die_type, name);
 	this->type_name = name;
+
+	/*set source file name*/
+	//cout<<"src_fileno["<<src_list.size()<<"]"<<endl;
+	get_die_file_number(die_type, &fnumber);
+	if(fnumber >= 1 && fnumber-1 < src_list.size()){
+		this->decl_file = src_list.at(fnumber-1);
+		//cout<<name<<"["<<(fnumber-1)<<"]: "<<this->decl_file<<endl;
+	}else{
+		this->decl_file = "<decl_file unavaliable>";
+	}
+
+//	FILE *fp = fopen("struct_off_list.txt", "a");
+//	fprintf(fp, "%s %x\n",name.c_str(), off_type);
+//	fclose(fp);
 
 	/*get length*/
 	get_die_size(die_type, &size);
@@ -338,17 +380,17 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 					break;
 				}
 				case DW_TAG_structure_type:{
-					dstruct * member = new dstruct(dbg, *member_source, die_member_type, off_member_type, offset, this);
+					dstruct * member = new dstruct(dbg, *member_source, die_member_type, off_member_type, offset, src_list, this);
 					this->member_list.push_back(member);
 					break;
 				}
 				case DW_TAG_array_type:{
-					darray * member = new darray(dbg, *member_source, die_member_type, off_member_type, offset, this);
+					darray * member = new darray(dbg, *member_source, die_member_type, off_member_type, offset, src_list, this);
 					this->member_list.push_back(member);
 					break;
 				}
 				case DW_TAG_pointer_type:{
-					dptr * member = new dptr(dbg, *member_source, die_member_type, off_member_type, offset, this);
+					dptr * member = new dptr(dbg, *member_source, die_member_type, off_member_type, offset, src_list, this);
 					this->member_list.push_back(member);
 					break;
 				}
@@ -361,6 +403,54 @@ dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_O
 
 		/*get next member*/
 		res = dwarf_siblingof(dbg, die_member, &die_member, &error);
+	}
+}
+
+dstruct::dstruct(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, set<dvariable *> member_list, map<int, string> src_list, dvariable *parent)
+:dvariable(source)
+{
+	int res;
+	bool res_b;
+	int i, j;
+	int size = 0;
+	unsigned fnumber = 0;
+	Dwarf_Die die_member = 0;
+	Dwarf_Half tag_member = 0;
+	Dwarf_Error error = 0;
+	string name;
+	string type_name;
+
+	/*set dvariable*/
+	this->s_offset = member_loc;
+	this->var_struct_type = DVAR_STRUCT;
+	this->parent = parent;
+
+	/*set type*/
+	this->var_type = off_type;
+
+	/*type name*/
+	get_die_name(dbg, die_type, name);
+	this->type_name = name;
+
+	/*set source file name*/
+	get_die_file_number(die_type, &fnumber);
+	if(fnumber >= 1 && fnumber-1 < src_list.size()){
+		this->decl_file = src_list.at(fnumber-1);
+	}else{
+		this->decl_file = "<decl_file unavaliable>";
+	}
+
+	/*get length*/
+	get_die_size(die_type, &size);
+	this->struct_length = size;
+
+	/*type name*/
+	get_die_name(dbg, die_type, type_name);
+	this->type_name = type_name;
+
+	set<dvariable *>::iterator it;
+	for(it = member_list.begin(); it != member_list.end(); it ++){
+		this->member_list.push_back(*it);
 	}
 }
 
@@ -379,7 +469,7 @@ void dstruct::print_me(){
 }
 
 
-darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
+darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string>src_list, dvariable *parent)
 :dvariable(source)
 {
 	bool result = false;
@@ -416,17 +506,17 @@ darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off
 			break;
 		}
 		case DW_TAG_structure_type:{
-			dstruct * member = new dstruct(dbg, source, die_element_type, off_element_type, 0, this);
+			dstruct * member = new dstruct(dbg, source, die_element_type, off_element_type, 0, src_list, this);
 			this->var = member;
 			break;
 		}
 		case DW_TAG_array_type:{
-			darray * member = new darray(dbg, source, die_element_type, off_element_type, 0, this);
+			darray * member = new darray(dbg, source, die_element_type, off_element_type, 0, src_list, this);
 			this->var = member;
 			break;
 		}
 		case DW_TAG_pointer_type:{
-			dptr * member = new dptr(dbg, source, die_element_type, off_element_type, 0, this);
+			dptr * member = new dptr(dbg, source, die_element_type, off_element_type, 0, src_list, this);
 			this->var = member;
 			break;
 		}
@@ -435,6 +525,12 @@ darray::darray(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off
 		}
 		}
 	}
+}
+
+darray::darray(dvariable &source, dvariable *var, int size)
+:dvariable(source){
+	this->array_size = size;
+	this->var = var;
 }
 
 void darray::print_me(){
@@ -449,7 +545,7 @@ void darray::print_me(){
 	//cout<<"*************************"<<endl;
 }
 
-dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, dvariable *parent)
+dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off_type, int member_loc, map<int, string>src_list, dvariable *parent)
 :dvariable(source)
 {
 	bool result = false;
@@ -496,17 +592,17 @@ dptr::dptr(Dwarf_Debug dbg, dvariable &source, Dwarf_Die die_type, Dwarf_Off off
 			break;
 		}
 		case DW_TAG_structure_type:{
-			dstruct * member = new dstruct(dbg, source, die_target_type, off_target_type, 0, this);
+			dstruct * member = new dstruct(dbg, source, die_target_type, off_target_type, 0, src_list, this);
 			this->var = member;
 			break;
 		}
 		case DW_TAG_array_type:{
-			darray * member = new darray(dbg, source, die_target_type, off_target_type, 0, this);
+			darray * member = new darray(dbg, source, die_target_type, off_target_type, 0, src_list, this);
 			this->var = member;
 			break;
 		}
 		case DW_TAG_pointer_type:{
-			dptr * member = new dptr(dbg, source, die_target_type, off_target_type, 0, this);
+			dptr * member = new dptr(dbg, source, die_target_type, off_target_type, 0, src_list, this);
 			this->var = member;
 			break;
 		}
@@ -533,7 +629,7 @@ void dptr::print_me(){
 	//cout<<"*************************"<<endl;
 }
 
-subprogram::subprogram(Dwarf_Debug dbg, Dwarf_Die die_subprog){
+subprogram::subprogram(Dwarf_Debug dbg, Dwarf_Die die_subprog, map<int, string> src_list){
 	string name;
 
 	/*set subprogram name*/
@@ -544,7 +640,7 @@ subprogram::subprogram(Dwarf_Debug dbg, Dwarf_Die die_subprog){
 	get_frame_base(dbg, die_subprog, this->frame_base);
 
 	/*push variables into vector*/
-	handle_child_and_sibling(dbg, die_subprog, this->var_list, this->frame_base);
+	handle_child_and_sibling(dbg, die_subprog, this->var_list, src_list, this->frame_base);
 }
 
 program::program(Dwarf_Debug dbg){
@@ -569,13 +665,17 @@ program::program(Dwarf_Debug dbg){
 			//printf("Done\n");
 			return;
 		}
-		//printf("find new CU\n");
+
 		/* The CU will have a single sibling, a cu_die. */
 		res = dwarf_siblingof(dbg, no_die, &cu_die, &error);
 		if (res == DW_DLV_ERROR) {
 			printf("Error in dwarf_siblingof on CU die \n");
 			exit(1);
 		}
+
+		/*get the src file name list of this CU*/
+		map<int, string> src_list;
+		get_file_list(dbg, cu_die, src_list);
 
 		/*get all children of cu_die*/
 		Dwarf_Die die_cu_child = 0;
@@ -588,7 +688,7 @@ program::program(Dwarf_Debug dbg){
 			switch(child_tag){
 			case DW_TAG_subprogram:{
 				//printf("\t\tDW_TAG_subprogram\n");
-				subprogram * subprog = new subprogram(dbg, die_cu_child);
+				subprogram * subprog = new subprogram(dbg, die_cu_child, src_list);
 
 				/*no name/artificial -> don't push into stack*/
 				if(subprog->name == "" || check_artificial(die_cu_child) == true){
@@ -616,17 +716,17 @@ program::program(Dwarf_Debug dbg){
 						break;
 					}
 					case DW_TAG_structure_type:{
-						dstruct * member = new dstruct(dbg, *source, die_type_cur, off_type_cur, 0, 0);
+						dstruct * member = new dstruct(dbg, *source, die_type_cur, off_type_cur, 0, src_list,0);
 						this->global_var_list.push_back(member);
 						break;
 					}
 					case DW_TAG_array_type:{
-						darray * member = new darray(dbg, *source, die_type_cur, off_type_cur, 0, 0);
+						darray * member = new darray(dbg, *source, die_type_cur, off_type_cur, 0, src_list, 0);
 						this->global_var_list.push_back(member);
 						break;
 					}
 					case DW_TAG_pointer_type:{
-						dptr * member = new dptr(dbg, *source, die_type_cur, off_type_cur, 0, 0);
+						dptr * member = new dptr(dbg, *source, die_type_cur, off_type_cur, 0, src_list, 0);
 						this->global_var_list.push_back(member);
 						break;
 					}

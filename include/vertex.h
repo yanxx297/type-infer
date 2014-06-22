@@ -219,8 +219,8 @@ struct func_vertex_block{
 
 typedef func_vertex_block * func_vertex_ptr;
 
-
 bool check_child(dvariable *var_p, dvariable *var_c);
+bool check_direct_child(dvariable *var_p, dvariable *var_c);
 bool check_child_from_parent(dvariable *var_p, dvariable *var_c);
 
 #endif /* NODE_H_ */

@@ -135,7 +135,7 @@ static std::string indirect[] = {
 		"wcscpy",
 		"wcslen",
 		"wcsrchr",
-		"wmemcmp"
+		"wmemcmp",
 };
 
 static std::string unop_label[] = {"NEG", "NOT"};

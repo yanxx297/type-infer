@@ -203,7 +203,8 @@ int search_by_func_name(func_vertex_ptr func_block, fblock_ptr *vine_ir_block) {
 
 }
 
-/*Tell me whether v_des is a node of variable by traveling through variable vector*/bool is_var(func_vertex_ptr func_block, Graph::vertex_descriptor v_des) {
+/*Tell me whether v_des is a node of variable by traveling through variable vector*/
+bool is_var(func_vertex_ptr func_block, Graph::vertex_descriptor v_des) {
 	bool res = false;
 	int i;
 	for (i = 0; i < func_block->variable_list.size(); i++) {
@@ -232,7 +233,7 @@ int var_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt) {
 		case BINOP: {
 			for (i = 0; i < func_block->variable_list.size(); i++) {
 				dvariable *dvar = func_block->variable_list.at(i)->debug_info;
-				if (dvar->cmp_loc(((Mem *) exp)->addr, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true) {
+				if (dvar->cmp_loc(((Mem *) exp)->addr, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true	) {
 					result = func_block->variable_list.at(i)->my_descriptor;
 					break;
 				}
@@ -362,7 +363,31 @@ Graph::vertex_descriptor node_searcher(func_vertex_ptr func_list, int block, int
 	return result;
 }
 
-//Looking for the defination of target starting from the given position
+//look forward for EXP, where EXP = target
+//EXP can either be a register or a mem[]
+bool assign_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *block, int *stmt, Tmp_s *target, Exp *&res){
+	int current_block = block_no;
+	int current_stmt = stmt_no;
+	bool result = true;
+	while (result != false) {
+		if (vine_ir_block->block_list[current_block]->block[current_stmt]->stmt_type == MOVE) {
+			Move *move = ((Move *) vine_ir_block->block_list[current_block]->block[current_stmt]);
+			if (is_tmps(move->rhs) == true) {
+				Tmp_s *reg = ((Tmp_s *) move->rhs);
+				if (reg->cmp_tmp(target) == true){
+					*block = current_block;
+					*stmt = current_stmt;
+					res = move->lhs;
+					return true;
+				}
+			}
+		}
+		result = get_next_stmt(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt);
+	}
+	return false;
+}
+
+//Looking backward for the defination of target starting from the given position
 //return the Exp * of the exp equaling to target
 bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *block, int *stmt, Tmp_s *target, Exp *&res) {
 	/*No defination for Tmp_s whose index is from 0 to 35*/
@@ -400,7 +425,8 @@ bool def_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *bloc
 }
 
 /*Look for the defination of SF*/
-/*Return the corresponding nodes of var/reg/exp in the equation of SF*/bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g) {
+/*Return the corresponding nodes of var/reg/exp in the equation of SF*/
+bool sf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_no, int stmt_no, Temp *exp, Graph& g) {
 	Exp *def;
 	bool result = false;
 	Graph::vertex_descriptor opr_l = -1;
@@ -1015,201 +1041,91 @@ void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tm
 
 //Set signed/unsigned of function params and return value according to function name
 //Use dbg info or harded coded assignment based on existed knowledge
-void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, string func_name, Graph &g) {
+void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, map<string, string> &funcname_map, int block, int stmt, string func_name, Graph &g) {
 	int i;
 	int res = -1;
-	for (i = IFUNC_STRCAT; i <= IFUNC_WMEMCMP; i++) {
-		if (func_name == indirect[i]) {
-			res = i;
-			break;
-		}
-	}
 
-	if (res == -1) {
+	if(funcname_map.count(func_name) == 1){
+		if(funcname_map.at(func_name) != ""){
+			check_func(vine_ir_block, func_list, block, stmt, funcname_map.at(func_name), g);
+		}else{
+			/*Hardcode is required*/
+			bool result;
+			int current_block = 0;
+			int current_stmt = 0;
+			Exp *ret;
+			if(func_name == "bcmp"){
+				//int bcmp(const void *s1, const void *s2, size_t n)
+				result = get_return_value(vine_ir_block, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, SIGNED_T, g);
+				}
+
+				result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
+				}
+			}else if(func_name == "memmove"){
+				//void *memmove(void *dest, const void *src, size_t n)
+				result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
+				}
+			}else if(func_name == "bcopy"){
+				//void bcopy(const void *src, void *dest, size_t n)
+				result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
+				}
+			}else if(func_name == "bzero"){
+				//void bzero(void *s, size_t n)
+				result = get_xth_param(vine_ir_block, 4, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
+				}
+			}else if(func_name == "scalbln" || func_name == "scalbn"){
+				//double scalbln(double x, long int exp);
+				//double scalbn(double x, int exp);
+				result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, SIGNED_T, g);
+				}
+			}else if(func_name == "scalblnf" || func_name == "scalbnf"){
+				//float scalblnf(float x, long int exp);
+				//float scalbnf(float x, int exp);
+				result = get_xth_param(vine_ir_block, 4, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, SIGNED_T, g);
+				}
+			}else if(func_name == "scalblnl" || func_name == "scalbnl"){
+				//long double scalblnl(long double x, long int exp);
+				//long double scalbnl(long double x, int exp);
+				result = get_xth_param(vine_ir_block, 12, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, SIGNED_T, g);
+				}
+			}else if(func_name == "ntohl" || func_name == "htonl" || func_name == "ntohs" || func_name == "htons"){
+				//uint32_t htonl(uint32_t hostlong);
+				result = get_xth_param(vine_ir_block, 0, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
+				}
+
+				result = get_return_value(vine_ir_block, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
+				}
+			}else if(func_name == "ntp_adjtime" || func_name == "adjtimex"){
+				//int ntp_adjtime(struct timex *);
+				result = get_return_value(vine_ir_block, block, stmt, &current_block, &current_stmt, ret);
+				if (result == true) {
+					set_single_edge(func_list, ret, current_block, current_stmt, SIGNED_T, g);
+				}
+			}
+		}
+	}else{
+		/*function whose name is func_name can be directly found in libc-dbg*/
 		check_func(vine_ir_block, func_list, block, stmt, func_name, g);
-	} else {
-		//indirect function
-		//set func_name to a hardcoded special function name, who has the same ret/param types of the original function
-		bool result;
-		int current_block = 0;
-		int current_stmt = 0;
-		Exp *ret;
-
-		switch (res) {
-		case IFUNC_STRCAT: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcat_g", g);
-			break;
-		}
-		case IFUNC_INDEX: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strchr_g", g);
-			break;
-		}
-		case IFUNC_STRCMP: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcmp_gg", g);
-			break;
-		}
-		case IFUNC_STRCPY: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcpy_g", g);
-			break;
-		}
-		case IFUNC_STRRCHR: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strrchr_g", g);
-			break;
-		}
-		case IFUNC_STRCSPN: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcspn_g", g);
-			break;
-		}
-		case IFUNC_STRLEN: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strlen_g", g);
-			break;
-		}
-		case IFUNC_STRNLEN: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strnlen_ia32", g);
-			break;
-		}
-		case IFUNC_STRNCAT: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strncat_g", g);
-			break;
-		}
-		case IFUNC_STRNCMP: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strncmp_g", g);
-			break;
-		}
-		case IFUNC_STRNCPY: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strncpy_gg", g);
-			break;
-		}
-		case IFUNC_RINDEX: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strrchr_g", g);
-			break;
-		}
-		case IFUNC_STRPBRK: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strpbrk_g", g);
-			break;
-		}
-		case IFUNC_STRSPN: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strspn_g", g);
-			break;
-		}
-		case IFUNC_MEMCHR: {
-			//use memset() instead
-			check_func(vine_ir_block, func_list, block, stmt, "__memset_gcn_by4", g);
-			break;
-		}
-		case IFUNC_BCMP: {
-			//int bcmp(const void *s1, const void *s2, size_t n)
-			result = get_return_value(vine_ir_block, block, stmt, &current_block, &current_stmt, ret);
-			if (result == true) {
-				set_single_edge(func_list, ret, current_block, current_stmt, SIGNED_T, g);
-			}
-
-			result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
-			if (result == true) {
-				set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
-			}
-			break;
-		}
-		case IFUNC_MEMMOVE: {
-			//void *memmove(void *dest, const void *src, size_t n)
-			result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
-			if (result == true) {
-				set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
-			}
-			break;
-		}
-		case IFUNC_MEMSET: {
-			check_func(vine_ir_block, func_list, block, stmt, "__memset_gcn_by4", g);
-			break;
-		}
-		case IFUNC_MEMPCPY: {
-			//mempcpy's type in string.h is different from that in man doc
-			//mempcpy has the same type as memcpy
-			check_func(vine_ir_block, func_list, block, stmt, "__memcpy_g", g);
-			break;
-		}
-		case IFUNC_BCOPY: {
-			//void bcopy(const void *src, void *dest, size_t n)
-			result = get_xth_param(vine_ir_block, 8, block, stmt, &current_block, &current_stmt, ret);
-			if (result == true) {
-				set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
-			}
-			break;
-		}
-		case IFUNC_BZERO: {
-			//void bzero(void *s, size_t n)
-			result = get_xth_param(vine_ir_block, 4, block, stmt, &current_block, &current_stmt, ret);
-			if (result == true) {
-				set_single_edge(func_list, ret, current_block, current_stmt, UNSIGNED_T, g);
-			}
-			break;
-		}
-		case IFUNC_STPCPY: {
-			check_func(vine_ir_block, func_list, block, stmt, "__stpcpy_g", g);
-			break;
-		}
-		case IFUNC_STPNCPY: {
-			//same param/ret type as strncpy
-			check_func(vine_ir_block, func_list, block, stmt, "__strncpy_gg", g);
-			break;
-		}
-		case IFUNC_STRCASECMP: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcasecmp_nonascii", g);
-			break;
-		}
-		case IFUNC_STRNCASECMP: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcasecmp_l_nonascii", g);
-			break;
-		}
-		case IFUNC_MEMCPY: {
-			check_func(vine_ir_block, func_list, block, stmt, "__memcpy_g", g);
-			break;
-		}
-		case IFUNC_RAWMEMCHR: {
-			//use memset() instead
-			check_func(vine_ir_block, func_list, block, stmt, "__memset_gcn_by4", g);
-			break;
-		}
-		case IFUNC_MEMRCHR: {
-			check_func(vine_ir_block, func_list, block, stmt, "__memrchr_ia32", g);
-			break;
-		}
-		case IFUNC_STRSTR: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strstr_g", g);
-			break;
-		}
-		case IFUNC_STRCASESTR: {
-			check_func(vine_ir_block, func_list, block, stmt, "__strcasestr_ia32", g);
-			break;
-		}
-		case IFUNC_WCSCHR: {
-			check_func(vine_ir_block, func_list, block, stmt, "__wcschr_ia32", g);
-			break;
-		}
-		case IFUNC_WCSCMP: {
-			check_func(vine_ir_block, func_list, block, stmt, "__wcscmp_ia32", g);
-			break;
-		}
-		case IFUNC_WCSCPY: {
-			check_func(vine_ir_block, func_list, block, stmt, "__wcscpy_ia32", g);
-			break;
-		}
-		case IFUNC_WCSLEN: {
-			check_func(vine_ir_block, func_list, block, stmt, "__wcslen_ia32", g);
-			break;
-		}
-		case IFUNC_WCSRCHR: {
-			check_func(vine_ir_block, func_list, block, stmt, "__wcsrchr_ia32", g);
-			break;
-		}
-		case IFUNC_WMEMCMP: {
-			check_func(vine_ir_block, func_list, block, stmt, "__wmemcmp_ia32", g);
-			break;
-		}
-		default: {
-			break;
-		}
-		}
 	}
 }
 
@@ -1251,9 +1167,11 @@ void check_func(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, 
 		if (result == false) {
 			/*It may happen that the ret value is not used in this program*/
 			/*e.g. fclose(fp)*/
+		}else if(false == is_tmps(ret_var)){
+			/*get_return_value() should return a eax*/
 		} else {
 			/*set edge of ret value*/
-			set_edge(vine_ir_block, func_list, dbg, subprog, current_block, current_stmt, NULL, ret_var, g);
+			set_edge(vine_ir_block, func_list, dbg, subprog, current_block, current_stmt, NULL, (Tmp_s *)ret_var, true, g);
 		}
 
 		//-------------------------------------------------------------------------------------------X
@@ -1278,8 +1196,10 @@ void check_func(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, 
 						//check whether param correspond to current stmt
 						if (check_param(vine_ir_block->block_list[current_block]->block[current_stmt], offset) == true) {
 							Exp *current_exp = ((Move *) vine_ir_block->block_list[current_block]->block[current_stmt])->rhs;
-							set_edge(vine_ir_block, func_list, dbg, param, current_block, current_stmt, &offset, current_exp, g);
-							break;
+							if(true == is_tmps(current_exp)){
+								set_edge(vine_ir_block, func_list, dbg, param, current_block, current_stmt, &offset, (Tmp_s *)current_exp, false, g);
+								break;
+							}
 						} else {
 							//go next
 						}
@@ -1300,15 +1220,96 @@ void check_func(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, 
 }
 
 //Set edges of a param/ret according to Die
-bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug dbg, Dwarf_Die param, int block, int stmt, int *new_offset, Exp *current_exp, Graph &g) {
+//Since mem[] = mem[] is not allowed in Vine IR, current_exp must be a register, rather than a mem[]
+bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug dbg, Dwarf_Die param, int block, int stmt, int *new_offset, Tmp_s *current_exp, bool is_ret, Graph &g){
 	bool result;
 	sign_type_t su_param;
+	Dwarf_Die type_die;
+	Dwarf_Off type_off;
+	Dwarf_Half param_tag;
 	int length;
-	//set s/u
-	result = get_su(dbg, param, &su_param);
-	if (result == false) {
-		check_call_pointer(dbg, param, vine_ir_block, func_list, block, stmt, current_exp, g);
-	} else {
+
+	//get type of param
+	result = get_die_type(dbg, param, &type_die, &type_off);
+	if(result == false){
+		return false;
+	}
+
+	//get tag and check whether param is a ptr
+	result = get_die_tag(type_die, &param_tag);
+	if(result == false){
+		return false;
+	}
+
+	//If current_exp is a return value, look for Exp = current_exp
+	//Otherwise(parameter) look for current_exp = Exp;
+	Exp *def = 0;
+	int current_block = block;
+	int current_stmt = stmt;
+	if(is_ret == true){
+		assign_searcher(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt, current_exp, def);
+	}else{
+		def_searcher(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt, current_exp, def);
+	}
+
+	if(param_tag == DW_TAG_pointer_type){
+		//get original type of a pointer
+		result = get_original_type(dbg, param, &type_die);
+		if(result == false){
+			return false;
+		}
+
+		//check whether its single type
+		Dwarf_Die die;
+		result = is_single_die(dbg, type_die, &die);
+		if(result == false){
+			/*struct pointer*/
+			if(false == check_call_pointer(dbg, param, vine_ir_block, func_list, block, stmt, current_exp, g)
+					&& def != 0){
+				check_call_pointer(dbg, param, vine_ir_block, func_list, block, stmt, def, g);
+			}
+		}else{
+			/*Single type pointer*/
+
+			Tmp_s *addr = current_exp;
+			Graph::vertex_descriptor vtd = -1;
+
+			/*case 1: addr is a register containning a pointer*/
+			vtd = ptarget_lookup(func_list, addr, block, stmt);
+
+			/*case 2: addr is a copy of another pointer*/
+			/*Look for the assignment of addr*/
+			if(vtd == -1 && def != 0){
+				vtd = ptarget_lookup(func_list, def, block, stmt);
+			}
+
+			if(vtd == -1){
+				return false;
+			}
+
+			result = get_die_su(die, &su_param);
+			if(result == false){
+				return false;
+			}
+			if(su_param == SIGNED_T){
+				add_edge_with_cap(func_list, func_list->s_des, vtd, MAX_CAP, 0, g);
+			}else if(su_param == UNSIGNED_T){
+				add_edge_with_cap(func_list, vtd, func_list->u_des, MAX_CAP, 0, g);
+			}else{
+				return false;
+			}
+
+		}
+	}else{
+		/*single type non-pointer*/
+
+			//get signedness
+		result = get_die_su(type_die, &su_param);
+		if(result == false){
+			return false;
+		}
+
+			//Set signedness to corresponding node
 		Graph::vertex_descriptor vtd = -1;
 		vtd = read_exp(func_list, block, stmt, current_exp, g);
 		if (vtd != -1) {
@@ -1328,9 +1329,11 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 		}
 	}
 
+
 	// update offset
 	result = get_length(dbg, param, &length);
 	if (result == false) {
+		/*Fail to get the length of current param/ret value*/
 		if (new_offset != 0) {
 			char offstr[128];
 			sprintf(offstr, "%d", *new_offset);
@@ -1353,196 +1356,216 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 
 Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g) {
 	bool res;
+	bool flag_var = false;
 	Graph::vertex_descriptor vtd = -1;
 	if (func_block->node_list.count(exp) > 0) {
-		return func_block->node_list.at(exp);
-	}
-	switch (exp->exp_type) {
-	case BINOP: {
-		//Don't add this operation to graph if both operands are constant
-		if (((BinOp *) exp)->lhs->exp_type == CONSTANT && ((BinOp *) exp)->rhs->exp_type == CONSTANT) {
-			break;
-		}
-
-		Graph::vertex_descriptor v_l;
-		//= boost::add_vertex(g);
-		Graph::vertex_descriptor v_r;
-		Graph::vertex_descriptor v_op = -1;
-		//= boost::add_vertex(g);
-		v_l = read_exp(func_block, block, stmt, ((BinOp *) exp)->lhs, g);
-		v_r = read_exp(func_block, block, stmt, ((BinOp *) exp)->rhs, g);
-
-		Bin_Operation *op_vertex = new Bin_Operation(((BinOp *) exp)->binop_type, v_l, v_r, v_op, (BinOp *) exp, block, stmt);
-
-		/*Check duplicate operation*/
-		res = check_duplicate_operation(func_block, op_vertex);
-		if (res == false) {
-			//No duplicate
-			boost::property_map<Graph, id_exp_type_t>::type g_exp = boost::get(id_exp_type_t(), g);
-			boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
-			boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
-
-			//v_op= boost::add_vertex(g);
-			v_op = add_default_vertex(g, UNSIGNED_T);
-			op_vertex->my_descriptor = v_op;
-
-			func_block->op_list.insert(pair<Exp *, Bin_Operation *>(exp, op_vertex));
-			g_exp[v_op] = exp;
-			g_vet[v_op] = OPERATION;
-
-			char number[256];
-			sprintf(number, "%d", v_op);
-			string number_str = std::string(number);
-			g_name[v_op] = number_str + ":" + binop_label[((BinOp *) exp)->binop_type];
-
-			if (v_l != -1) {
-				add_edge_with_cap(func_block, v_l, v_op, 1, 0, g);
-			}
-			if (v_r != -1) {
-				add_edge_with_cap(func_block, v_r, v_op, 1, 0, g);
+		vtd = func_block->node_list.at(exp);
+	}else{
+		switch (exp->exp_type) {
+		case BINOP: {
+			//Don't add this operation to graph if both operands are constant
+			if (((BinOp *) exp)->lhs->exp_type == CONSTANT && ((BinOp *) exp)->rhs->exp_type == CONSTANT) {
+				break;
 			}
 
-			vtd = v_op;
-		} else {
-			//Duplicate.
-			vtd = func_block->op_list.at(exp)->my_descriptor;
-		}
+			Graph::vertex_descriptor v_l;
+			//= boost::add_vertex(g);
+			Graph::vertex_descriptor v_r;
+			Graph::vertex_descriptor v_op = -1;
+			//= boost::add_vertex(g);
+			v_l = read_exp(func_block, block, stmt, ((BinOp *) exp)->lhs, g);
+			v_r = read_exp(func_block, block, stmt, ((BinOp *) exp)->rhs, g);
 
-		break;
-	}
-	case UNOP: {
-		//Don't add this operation to graph if the operand is an constant
-		if (((UnOp *) exp)->exp->exp_type == CONSTANT) {
-			break;
-		}
+			Bin_Operation *op_vertex = new Bin_Operation(((BinOp *) exp)->binop_type, v_l, v_r, v_op, (BinOp *) exp, block, stmt);
 
-		Graph::vertex_descriptor v_target;
-		Graph::vertex_descriptor v_op = -1;
-		v_target = read_exp(func_block, block, stmt, ((UnOp *) exp)->exp, g);
+			/*Check duplicate operation*/
+			res = check_duplicate_operation(func_block, op_vertex);
+			if (res == false) {
+				//No duplicate
+				boost::property_map<Graph, id_exp_type_t>::type g_exp = boost::get(id_exp_type_t(), g);
+				boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
+				boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
 
-		Un_Operation *op_vertex = new Un_Operation(((UnOp *) exp)->unop_type, v_target, v_op, (UnOp *) exp, block, stmt);
+				//v_op= boost::add_vertex(g);
+				v_op = add_default_vertex(g, UNSIGNED_T);
+				op_vertex->my_descriptor = v_op;
 
-		res = check_duplicate_operation(func_block, op_vertex);
-		if (res == false) {
-			boost::property_map<Graph, id_exp_type_t>::type g_exp = boost::get(id_exp_type_t(), g);
-			boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
-			boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
+				func_block->op_list.insert(pair<Exp *, Bin_Operation *>(exp, op_vertex));
+				g_exp[v_op] = exp;
+				g_vet[v_op] = OPERATION;
 
-			//v_op = boost::add_vertex(g);
-			v_op = add_default_vertex(g, UNSIGNED_T);
-			op_vertex->my_descriptor = v_op;
+				char number[256];
+				sprintf(number, "%d", v_op);
+				string number_str = std::string(number);
+				g_name[v_op] = number_str + ":" + binop_label[((BinOp *) exp)->binop_type];
 
-			func_block->op_list.insert(pair<Exp *, Un_Operation *>(exp, op_vertex));
-			g_exp[v_op] = exp;
-			g_vet[v_op] = OPERATION;
-			g_name[v_op] = unop_label[((UnOp *) exp)->unop_type];
-
-			if (v_target != -1) {
-				add_edge_with_cap(func_block, v_target, v_op, 1, 0, g);
-			}
-			vtd = v_op;
-		} else {
-			vtd = func_block->op_list.at(exp)->my_descriptor;
-		}
-
-		break;
-	}
-	case CONSTANT: {
-		//No Exp
-		break;
-	}
-	case MEM: {
-		vtd = ptarget_lookup(func_block, ((Mem *) exp), block, stmt);
-
-		if (vtd == -1) {
-			vtd = var_lookup(func_block, exp, block, stmt);
-		}
-
-		//If still can't find, then look for mem[] = reg and return the vtd of reg
-		if (vtd == -1) {
-			vtd = copy_from_reg_lookup(func_block, block, stmt, ((Mem *) exp));
-		}
-
-#ifdef DEBUG
-		if(vtd != -1) {
-			printf("in %s\n",exp->tostring().c_str());
-		}
-		printf("result: %d\n",vtd);
-#endif
-		break;
-	}
-	case TEMP: {
-		if (get_reg_position(((Temp *) exp)->name) != -1) {
-			/*Register*/
-
-			/*Push register into vector & graph g, return index in vector*/
-			if (push_register(func_block, (Tmp_s *) exp, g) == true) {
-				vtd = func_block->reg_list.at(((Tmp_s *) exp)->index)->my_descriptor;
-			}
-
-			if (vtd != -1) {
-				/*check whether it's an variable*/
-				/*If so, add edge between this res and corresponding var*/
-				int count;
-				for (count = 0; count < func_block->variable_list.size(); count++) {
-					dvariable *var = func_block->variable_list.at(count)->debug_info;
-					if (var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true) {
-						add_edge_with_cap(func_block, vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
-					}
+				if (v_l != -1) {
+					add_edge_with_cap(func_block, v_l, v_op, 1, 0, g);
+				}
+				if (v_r != -1) {
+					add_edge_with_cap(func_block, v_r, v_op, 1, 0, g);
 				}
 
-				/*check whether it contains a pointer*/
-				for (count = 0; count < func_block->ptr_list.getsize(); count++) {
-					if (true == func_block->ptr_list.plist.at(count)->debug_info->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)) {
-						func_block->ptr_list.plist.at(count)->copy_list.push_back((Tmp_s *) exp);
-					}
+				vtd = v_op;
+			} else {
+				//Duplicate.
+				vtd = func_block->op_list.at(exp)->my_descriptor;
+			}
+
+			break;
+		}
+		case UNOP: {
+			//Don't add this operation to graph if the operand is an constant
+			if (((UnOp *) exp)->exp->exp_type == CONSTANT) {
+				break;
+			}
+
+			Graph::vertex_descriptor v_target;
+			Graph::vertex_descriptor v_op = -1;
+			v_target = read_exp(func_block, block, stmt, ((UnOp *) exp)->exp, g);
+
+			Un_Operation *op_vertex = new Un_Operation(((UnOp *) exp)->unop_type, v_target, v_op, (UnOp *) exp, block, stmt);
+
+			res = check_duplicate_operation(func_block, op_vertex);
+			if (res == false) {
+				boost::property_map<Graph, id_exp_type_t>::type g_exp = boost::get(id_exp_type_t(), g);
+				boost::property_map<Graph, boost::vertex_name_t>::type g_name = boost::get(boost::vertex_name, g);
+				boost::property_map<Graph, vertex_exp_type_t>::type g_vet = boost::get(vertex_exp_type_t(), g);
+
+				//v_op = boost::add_vertex(g);
+				v_op = add_default_vertex(g, UNSIGNED_T);
+				op_vertex->my_descriptor = v_op;
+
+				func_block->op_list.insert(pair<Exp *, Un_Operation *>(exp, op_vertex));
+				g_exp[v_op] = exp;
+				g_vet[v_op] = OPERATION;
+				g_name[v_op] = unop_label[((UnOp *) exp)->unop_type];
+
+				if (v_target != -1) {
+					add_edge_with_cap(func_block, v_target, v_op, 1, 0, g);
+				}
+				vtd = v_op;
+			} else {
+				vtd = func_block->op_list.at(exp)->my_descriptor;
+			}
+
+			break;
+		}
+		case CONSTANT: {
+			//No Exp
+			break;
+		}
+		case MEM: {
+			vtd = ptarget_lookup(func_block, ((Mem *) exp)->addr, block, stmt);
+
+			if (vtd == -1) {
+				vtd = var_lookup(func_block, exp, block, stmt);
+				if(vtd != -1){
+					flag_var = true;
 				}
 			}
 
-		} else {
-			/*temporary variables*/
-			/*Should be translate to expressions of registers and constants, recursively*/
-			/*SHOULD NOT EXIST since I have translate all temporary variables into register expression*/
+			//If still can't find, then look for mem[] = reg and return the vtd of reg
+			if (vtd == -1) {
+				vtd = copy_from_reg_lookup(func_block, block, stmt, ((Mem *) exp));
+			}
+
+	#ifdef DEBUG
+			if(vtd != -1) {
+				printf("in %s\n",exp->tostring().c_str());
+			}
+			printf("result: %d\n",vtd);
+	#endif
+			break;
 		}
-		break;
-	}
-	case PHI: {
-		//No Exp
-		break;
-	}
-	case CAST: {
-		//??????
-		//How to deal with cast?
-		vtd = read_exp(func_block, block, stmt, ((Cast *) exp)->exp, g);
-		break;
-	}
-	case NAME: {
-		//No Exp
-		break;
-	}
-	case UNKNOWN: {
-		//No Exp
-		break;
-	}
-	case LET: {
-		//??????????
-		//What's let?
-		read_exp(func_block, block, stmt, ((Let *) exp)->exp, g);
-		read_exp(func_block, block, stmt, ((Let *) exp)->var, g);
-		read_exp(func_block, block, stmt, ((Let *) exp)->in, g);
-		break;
-	}
-	case EXTENSION: {
-		//No definition?!
-		break;
-	}
-	default:
-		break;
+		case TEMP: {
+			if (get_reg_position(((Temp *) exp)->name) != -1) {
+				/*Register*/
+
+				/*Push register into vector & graph g, return index in vector*/
+				if (push_register(func_block, (Tmp_s *) exp, g) == true) {
+					vtd = func_block->reg_list.at(((Tmp_s *) exp)->index)->my_descriptor;
+				}
+
+				if (vtd != -1) {
+					/*check whether it's an variable*/
+					/*If so, add edge between this res and corresponding var*/
+					int count;
+					for (count = 0; count < func_block->variable_list.size(); count++) {
+						dvariable *var = func_block->variable_list.at(count)->debug_info;
+						if (var->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address) == true) {
+							add_edge_with_cap(func_block, vtd, func_block->variable_list.at(count)->my_descriptor, 1, 1, g);
+						}
+					}
+
+					/*check whether it contains a pointer*/
+					for (count = 0; count < func_block->ptr_list.getsize(); count++) {
+						if (true == func_block->ptr_list.plist.at(count)->debug_info->cmp_reg(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)) {
+							func_block->ptr_list.plist.at(count)->copy_list.push_back((Tmp_s *) exp);
+						}
+					}
+				}
+
+			} else {
+				/*temporary variables*/
+				/*Should be translate to expressions of registers and constants, recursively*/
+				/*SHOULD NOT EXIST since I have translate all temporary variables into register expression*/
+			}
+			break;
+		}
+		case PHI: {
+			//No Exp
+			break;
+		}
+		case CAST: {
+			//??????
+			//How to deal with cast?
+			vtd = read_exp(func_block, block, stmt, ((Cast *) exp)->exp, g);
+			break;
+		}
+		case NAME: {
+			//No Exp
+			break;
+		}
+		case UNKNOWN: {
+			//No Exp
+			break;
+		}
+		case LET: {
+			//??????????
+			//What's let?
+			read_exp(func_block, block, stmt, ((Let *) exp)->exp, g);
+			read_exp(func_block, block, stmt, ((Let *) exp)->var, g);
+			read_exp(func_block, block, stmt, ((Let *) exp)->in, g);
+			break;
+		}
+		case EXTENSION: {
+			//No definition?!
+			break;
+		}
+		default:
+			break;
+		}
 	}
 
-	//if(vtd != -1){
+	/*check the length of this memory access (by checking the register copied from/to this memory block), if length is avaliable*/
+	if(flag_var == true
+			&& exp->exp_type == MEM
+			&& vtd != -1)
+	{
+		reg_t reg;
+		reg = ((Mem *)exp)->typ;
+
+		boost::property_map<Graph, id_pos_type_t>::type g_id = boost::get(id_pos_type_t(), g);
+		if(cmp_access_len(reg, (8*func_block->variable_list.at(g_id[vtd])->debug_info->var_length)) == false){
+			vtd = -1;
+		}
+	}
+
+	insert_vtd:
+	if(vtd != -1){
 	func_block->node_list.insert(pair<Exp *, Graph::vertex_descriptor>(exp, vtd));
-	//}
+	}
 	return vtd;
 }
 
@@ -1580,8 +1603,11 @@ bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int bloc
 						for (j = 0; j < arr->loclist.size(); j++) {
 							if (arr->loclist.at(j)->loc_type == OFFSET_LOC) {
 								offset_loc *loc = ((offset_loc *) arr->loclist.at(j));
-								if (loc->offset == offset && loc->reg_name == tmp->name) {
-									add_edge_with_cap(func_block, op, func_block->variable_list.at(i)->my_descriptor, 1, 1, g);
+								if (loc->offset == offset
+										&& loc->reg_name == tmp->name
+										&& is_tmps(mov->lhs) == true) {
+									func_block->variable_list.at(i)->field_copy_list.push_back(((Tmp_s *)mov->lhs));
+									//add_edge_with_cap(func_block, op, func_block->variable_list.at(i)->my_descriptor, 1, 1, g);
 									return true;
 								}
 							}
@@ -1589,15 +1615,15 @@ bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int bloc
 					}
 				}
 
-				for (i = 0; i < func_block->ptarget_list.size(); i++) {
-					for (j = 0; j < func_block->ptarget_list.at(i)->debug_info_list.size(); j++) {
-						address_t pc = mov->asm_address;
-						if (func_block->ptarget_list.at(i)->debug_info_list.at(j)->cmp_loc(rexp, pc) == true) {
-							add_edge_with_cap(func_block, op, func_block->ptarget_list.at(i)->my_descriptor, 1, 1, g);
-							return true;
-						}
-					}
-				}
+//				for (i = 0; i < func_block->ptarget_list.size(); i++) {
+//					for (j = 0; j < func_block->ptarget_list.at(i)->debug_info_list.size(); j++) {
+//						address_t pc = mov->asm_address;
+//						if (func_block->ptarget_list.at(i)->debug_info_list.at(j)->cmp_loc(rexp, pc) == true) {
+//							add_edge_with_cap(func_block, op, func_block->ptarget_list.at(i)->my_descriptor, 1, 1, g);
+//							return true;
+//						}
+//					}
+//				}
 				return false;
 			}
 		} else if (exp->binop_type == MINUS || offset < 0) {
@@ -1820,7 +1846,8 @@ bool check_call_pointer(Dwarf_Debug dbg, Dwarf_Die die, fblock_ptr vine_ir_block
 	/*get dvar*/
 	vector<location *> null_fb;
 	dvariable *source = new dvariable(dbg, die, null_fb);
-	dptr * var_l = new dptr(dbg, *source, die_type, off_type, 0, (dvariable *) 0);
+	map<int, string> src_list;	//Empty src file list, since all var in dbg are defined by libc
+	dptr * var_l = new dptr(dbg, *source, die_type, off_type, 0, src_list, (dvariable *) 0);
 
 	switch (tag) {
 	case DW_TAG_pointer_type: {
@@ -1985,6 +2012,41 @@ bool is_single_ptr(dptr *ptr, dvariable *&ret) {
 	return false;
 }
 
+//Given a die, check whether it only have one type
+//Return a base die if yes
+bool is_single_die(Dwarf_Debug dbg, Dwarf_Die type_die, Dwarf_Die *ret){
+	bool result;
+	Dwarf_Half type_tag;
+	Dwarf_Die die;
+	Dwarf_Off type_off;
+	result = get_die_tag(type_die, &type_tag);
+	if(result == false){
+		return false;
+	}
+	switch(type_tag){
+	case DW_TAG_base_type:{
+		*ret = type_die;
+		return true;
+	}
+	case DW_TAG_pointer_type:
+	case DW_TAG_array_type:{
+		Dwarf_Die die = type_die;
+		result = get_die_type(dbg, die, &die, &type_off);
+		if(result == false){
+			return false;
+		}
+		result = is_single_die(dbg, die, ret);
+		return result;
+	}
+	case DW_TAG_structure_type:{
+		return false;
+	}
+	default:{
+		return false;
+	}
+	}
+}
+
 //Similar to push_each_pointer, but this one is for pushing ret/params of lib funcs to formal structure
 void push_lib_var(dvariable *var, vector<Pointed *> &ptarget_list) {
 	if (var == 0) {
@@ -2082,7 +2144,7 @@ bool get_return_value(fblock_ptr vine_ir_block, int block, int stmt, int *ret_bl
 				Tmp_s *reg = ((Tmp_s *) move->rhs);
 				if (reg->name == str_reg[R_EAX] && (move->lhs->exp_type == MEM || is_tmps(move->lhs) == true)) {
 					//mem[] = eax || reg = eax
-					ret_var = reg;
+					ret_var = reg; //return EAX
 					break;
 				}
 			}
@@ -2102,6 +2164,7 @@ bool get_return_value(fblock_ptr vine_ir_block, int block, int stmt, int *ret_bl
 
 //Called by switch braches in check_call()
 //exp->descriptor -- s/u node
+//Note that this function can only be used to connect a non-pointer variable and corresponding node in graph
 bool set_single_edge(func_vertex_ptr func_list, Exp *exp, int block, int stmt, sign_type_t signedness, Graph &g) {
 	int current_block = block;
 	int current_stmt = stmt;
@@ -2118,4 +2181,41 @@ bool set_single_edge(func_vertex_ptr func_list, Exp *exp, int block, int stmt, s
 	} else {
 		return false;
 	}
+}
+
+/*compare a length with a reg_t value*/
+/*This function is used to compare variable size with memory access length*/
+/*len is in bit, not byte*/
+bool cmp_access_len(reg_t reg, int len){
+	switch(reg){
+	case REG_1:{
+		if(len == 1)
+			return true;
+		break;
+	}
+	case REG_8:{
+		if(len == 8)
+			return true;
+		break;
+	}
+	case REG_16:{
+		if(len == 16)
+			return true;
+		break;
+	}
+	case REG_32:{
+		if(len == 32 || len == 64)	/*64-bit number is accessed by twice, 32 bits each time*/
+			return true;
+		break;
+	}
+	case REG_64:{
+		if(len == 64)
+			return true;
+		break;
+	}
+	default:{
+		break;
+	}
+	}
+	return false;
 }
