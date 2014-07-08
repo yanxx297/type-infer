@@ -263,6 +263,7 @@ void get_ptr_copy(func_vertex_ptr func_block, Move *exp, int block, int stmt){
 	}
 };
 
+//return the corresponding node of dptr* parent_ptr
 int ptr_node_lookup(func_vertex_ptr func_block, dptr * parent_ptr, int offset){
 	int k, w;
 	for(k = 0; k < func_block->ptarget_list.size(); k++){
@@ -289,6 +290,9 @@ int ptr_node_lookup(func_vertex_ptr func_block, dptr * parent_ptr, int offset){
 
 	return -1;
 }
+
+//check whether a exp correspond to a ptr
+bool ptr_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){}
 
 //check whether a memory access corresponse to a pointed target (ptarget)
 int ptarget_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
@@ -318,7 +322,13 @@ int ptarget_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
 	for(i = 0; i < func_block->ptr_list.getsize(); i++){
 		if(true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(reg, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)){
 			parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
-		}else{
+		}
+		else if(true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)
+				&& func_block->ptr_list.plist.at(i)->debug_info->var != 0
+				&& func_block->ptr_list.plist.at(i)->debug_info->var->var_struct_type == DVAR_BASE){
+			parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
+		}
+		else{
 			for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
 				if(reg->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
 					parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;

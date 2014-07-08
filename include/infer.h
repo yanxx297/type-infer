@@ -42,6 +42,7 @@ string get_full_name(dbase *var);
 Graph::vertex_descriptor read_exp(func_vertex_ptr func_block, int block, int stmt, Exp *exp, Graph& g);
 bool array_loopup(fblock_ptr vine_ir_block, func_vertex_ptr func_block, int block, int stmt, Move *mov, Graph::vertex_descriptor op, Graph &g);
 
+bool check_low_copy(func_vertex_ptr func_list, Tmp_s *dst, int block, int stmt);
 void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tmp_s *dst, Graph::vertex_descriptor v_src, Graph &g);
 void check_call(fblock_ptr vine_ir_block, func_vertex_ptr func_list, map<string, string> &funcname_map, int block, int stmt, string func_name, Graph &g);
 void check_func(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block, int stmt, string func_name, Graph &g);

@@ -363,6 +363,115 @@ Graph::vertex_descriptor node_searcher(func_vertex_ptr func_list, int block, int
 	return result;
 }
 
+//Given a Exp *, check whether the Exp* target is contained in this Exp*, recursively
+//Return the direct container of target if true
+bool check_contain(Exp *exp, Exp* target, Exp *ret){
+	switch (exp->exp_type) {
+	case BINOP: {
+		BinOp *bop = (BinOp *)exp;
+		if(bop->lhs == target || bop->rhs == target){
+			ret = exp;
+			return true;
+		}else if(true == check_contain(bop->lhs, target, ret)){
+			return true;
+		}else if(true == check_contain(bop->rhs, target, ret)){
+			return true;
+		}
+		return false;
+	}
+	case UNOP: {
+		UnOp *uop = (UnOp *)exp;
+		if(uop->exp == target){
+			ret = exp;
+			return true;
+		}else if(true == check_contain(uop->exp, target, ret)){
+			return true;
+		}
+		return false;
+	}
+	case MEM: {
+		Mem *mem = (Mem *)exp;
+		if(mem->addr == target){
+			ret = exp;
+			return true;
+		}else if(true == check_contain(mem->addr, target, ret)){
+			return true;
+		}
+		return false;
+	}
+	case PHI: {
+		Phi *phi = (Phi *)exp;
+		for(int i = 0; i < phi->vars.size(); i++){
+			if(phi->vars.at(i) == target){
+				ret = exp;
+				return true;
+			}else if(true == check_contain(phi->vars.at(i), target, ret)){
+				return true;
+			}
+		}
+		return false;
+	}
+	case CAST: {
+		Cast *cast = (Cast *)exp;
+		if(cast->exp == target){
+			ret = exp;
+			return true;
+		}else if(true == check_contain(cast->exp, target, ret)){
+			return true;
+		}
+		return false;
+	}
+	case LET: {
+		Let *let = (Let *)exp;
+		if(let->exp == target || let->var == target || let->in == target){
+			ret = exp;
+			return true;
+		}
+		if(true == check_contain(let->exp, target, ret)){
+			return true;
+		}else if(true == check_contain(let->var, target, ret)){
+			return true;
+		}else if(true == check_contain(let->in, target, ret)){
+			return true;
+		}
+		return false;
+	}
+	default:
+		return false;
+	}
+}
+
+//look for the next time a given Exp *target is used, starting from the next stmt of block:stmt
+//Return stmt#, block# and the Exp* containning target(optional)
+bool next_use_searcher(fblock_ptr vine_ir_block, int block, int stmt, Exp *target, int *ret_block, int *ret_stmt, Exp *res_exp){
+	bool result;
+	int current_stmt = stmt;
+	int current_block = block;
+	result = get_next_stmt(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt);
+	while(result != false){
+		Stmt *current_stat = vine_ir_block->block_list[current_block]->block[current_stmt];
+		if(current_stat->stmt_type == MOVE){
+			Move *mov = (Move *)current_stat;
+			Exp *res = 0;
+			if(mov->lhs == target ||  mov->rhs == target){
+				*ret_stmt = current_stmt;
+				*ret_block = current_block;
+				return true;
+			}else if(true == check_contain(mov->lhs, target, res) || true == check_contain(mov->rhs, target, res)){
+				*ret_stmt = current_stmt;
+				*ret_block = current_block;
+				if(res_exp != 0){
+					res_exp = res;
+				}
+				return true;
+			}
+		}
+		result = get_next_stmt(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt);
+	}
+
+	return false;
+}
+
 //look forward for EXP, where EXP = target
 //EXP can either be a register or a mem[]
 bool assign_searcher(fblock_ptr vine_ir_block, int block_no, int stmt_no, int *block, int *stmt, Tmp_s *target, Exp *&res){
@@ -950,6 +1059,84 @@ string get_full_name(dbase *var) {
 	return result;
 }
 
+//a char is always copied to register using unsigned extention mov (movzbl)
+//return true if dst is finally copied to a memory unit, false otherwise
+bool check_copy_to_mem(func_vertex_ptr func_list, Tmp_s *dst, int block, int stmt){
+	int current_block = block;
+	int current_stmt = stmt;
+	bool result;
+	Exp *res_exp;
+	result = next_use_searcher(func_list->stmt_block, current_block, current_stmt, dst, &current_block, &current_stmt, res_exp);
+	while(result == true){
+		Move *current_line = (Move *)func_list->stmt_block->block_list[current_block]->block[current_stmt];
+		if(current_line->lhs->exp_type == MEM
+				&& true == is_tmps(current_line->rhs)
+				&& true == ((Tmp_s *)current_line->rhs)->cmp_tmp(dst)){
+			return true;
+		}else if(true == is_tmps(current_line->lhs)
+				&& true == is_tmps(current_line->rhs)
+				&& true == ((Tmp_s *)current_line->rhs)->cmp_tmp(dst)){
+			result = next_use_searcher(func_list->stmt_block, current_block, current_stmt, current_line->lhs, &current_block, &current_stmt, res_exp);
+		}else if(true == is_tmps(current_line->lhs)
+				&& current_line->rhs->exp_type == PHI
+				&& current_line->rhs == res_exp){
+			result = next_use_searcher(func_list->stmt_block, current_block, current_stmt, current_line->lhs, &current_block, &current_stmt, res_exp);
+		}
+	}
+
+	return false;
+}
+
+//check whether a reg is copied partially(low digits only)
+//block & stmt: current block & stmt number of movzbl/sbl
+bool check_low_copy(func_vertex_ptr func_list, Tmp_s *dst, int block, int stmt){
+	/*Only work if dst is longer than 8*/
+	if(dst->typ <= REG_8){
+		return false;
+	}
+
+	/*get next instruction's block*/
+	address_t addr = func_list->stmt_block->block_list[block]->block[stmt]->asm_address;
+	int next_b = block;
+	do{
+		next_b ++;
+		if(next_b >= func_list->stmt_block->len){
+			return false;
+		}
+		if(func_list->stmt_block->block_list[next_b]->block[0]->asm_address > addr){
+			break;
+		}
+	}while(1);
+
+	/*look for mem[]/reg = cast()L:reg8_t*/
+	int j;
+	for(j = next_b; j < func_list->stmt_block->len; j++){
+		int i;
+		for(i = 0; i < func_list->stmt_block->block_list[j]->blen; i++){
+			if(func_list->stmt_block->block_list[j]->block[i]->stmt_type != MOVE){
+				continue;
+			}
+			Move *mov = (Move *)func_list->stmt_block->block_list[j]->block[i];
+			if((mov->lhs->exp_type == MEM || is_tmps(mov->lhs) == true)
+					&& mov->rhs->exp_type == CAST){
+				Exp *lcast = mov->rhs;
+				while(lcast->exp_type == CAST){
+					if(((Cast *)lcast)->cast_type == CAST_LOW
+							&& ((Cast *)lcast)->typ == REG_8
+							&& is_tmps(((Cast *)lcast)->exp) == true
+							&& ((Tmp_s *)((Cast *)lcast)->exp)->cmp_tmp(dst) == true){
+						return true;
+					}else{
+						lcast = ((Cast *)lcast)->exp;
+					}
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 //check whether it is a movzbl/movsbl
 //set source variable to signed/unsigned, respectively
 void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tmp_s *dst, Graph::vertex_descriptor v_src, Graph &g) {
@@ -959,9 +1146,18 @@ void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tm
 		typ = ((Mem *) src->exp)->typ;
 		break;
 	}
+	case TEMP:{
+		if(true == is_tmps(src->exp)){
+			typ = ((Tmp_s *)src->exp)->typ;
+			break;
+		}else{
+			return;
+		}
+	}
 	case CAST:{
-		typ = ((Cast *) src->exp)->typ;
-		break;
+		return;
+		//typ = ((Cast *) src->exp)->typ;
+		//break;
 	}
 	default:
 		break;
@@ -973,6 +1169,16 @@ void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tm
 			add_edge_with_cap(func_list, func_list->s_des, v_src, MAX_CAP, 0, g);
 		} else if (src->cast_type == CAST_UNSIGNED) {
 			//movzbl -> unsigned
+
+			//check whether next instruction only use lower 8 bits of casting result
+			if(true == check_low_copy(func_list, dst, block, stmt)){
+				return;
+			}
+
+			//check whether the extended result is finally copied back to memory
+			if(false == check_copy_to_mem(func_list, dst, block, stmt)){
+				return;
+			}
 
 			/*look for movsbl in next block*/
 			if ((block + 1) < func_list->stmt_block->len) {
@@ -1280,6 +1486,9 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 			/*case 2: addr is a copy of another pointer*/
 			/*Look for the assignment of addr*/
 			if(vtd == -1 && def != 0){
+				if(def->exp_type == MEM){
+					def = ((Mem *)def)->addr;
+				}
 				vtd = ptarget_lookup(func_list, def, block, stmt);
 			}
 

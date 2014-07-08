@@ -721,6 +721,7 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g) {
 
 				if (v_l != -1 && v_r != -1 && true == is_tmps(((Move *) vine_ir_block->block_list[j]->block[k])->lhs) && ((Move *) vine_ir_block->block_list[j]->block[k])->rhs->exp_type == CAST) {
 					//Check movzbl/movsbl
+					//Reg = Cast()
 					Tmp_s *dst = ((Tmp_s *) ((Move *) vine_ir_block->block_list[j]->block[k])->lhs);
 					Cast *src = ((Cast *) ((Move *) vine_ir_block->block_list[j]->block[k])->rhs);
 					check_movzsbl(func_list, j, k, src, dst, v_r, g);
@@ -924,8 +925,8 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 	id_to_vineir(func_list, g);
 
 //	Apply debug tools
-//	Traits::vertex_descriptor src = 2;
-//	print_path(src, func_list->u_des, g);
+	Traits::vertex_descriptor src = 0;
+	print_path(src, func_list->u_des, g);
 //	End of debug tools
 
 	//Display pointed info
