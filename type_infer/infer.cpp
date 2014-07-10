@@ -1489,7 +1489,10 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 				if(def->exp_type == MEM){
 					def = ((Mem *)def)->addr;
 				}
-				vtd = ptarget_lookup(func_list, def, block, stmt);
+				dptr *parent_ptr;
+				if(true == ptr_lookup(func_list, def, block, stmt, parent_ptr, 0)){
+					vtd = ptr_node_lookup(func_list, parent_ptr, 0);
+				}
 			}
 
 			if(vtd == -1){

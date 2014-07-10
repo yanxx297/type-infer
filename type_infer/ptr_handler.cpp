@@ -292,11 +292,8 @@ int ptr_node_lookup(func_vertex_ptr func_block, dptr * parent_ptr, int offset){
 }
 
 //check whether a exp correspond to a ptr
-bool ptr_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){}
-
-//check whether a memory access corresponse to a pointed target (ptarget)
-int ptarget_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
-	int i, j, k, w;
+bool ptr_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt, dptr*& ret_ptr, int *ret_cons){
+	int i, j;
 	Tmp_s *reg = 0;
 	int cons = -1;
 
@@ -315,33 +312,47 @@ int ptarget_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
 	}
 
 	if(reg == 0 || cons == -1){
-		return -1;
+		return false;
 	}
 
-	dptr * parent_ptr = 0;
+	dptr * res = 0;
 	for(i = 0; i < func_block->ptr_list.getsize(); i++){
-		if(true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(reg, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)){
-			parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
-		}
-		else if(true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)
-				&& func_block->ptr_list.plist.at(i)->debug_info->var != 0
-				&& func_block->ptr_list.plist.at(i)->debug_info->var->var_struct_type == DVAR_BASE){
-			parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
-		}
-		else{
+		if(true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(exp, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)
+				|| true == func_block->ptr_list.plist.at(i)->debug_info->cmp_loc(reg, func_block->stmt_block->block_list[block]->block[stmt]->asm_address)){
+			res = func_block->ptr_list.plist.at(i)->debug_info;
+		}else{
 			for(j = 0; j < func_block->ptr_list.plist.at(i)->copy_list.size(); j++){
 				if(reg->index == func_block->ptr_list.plist.at(i)->copy_list.at(j)->index){
-					parent_ptr = func_block->ptr_list.plist.at(i)->debug_info;
+					res = func_block->ptr_list.plist.at(i)->debug_info;
 					break;
 				}
 			}
 		}
-
-		if(parent_ptr != 0){
-			int vtd = ptr_node_lookup(func_block, parent_ptr, cons);
-			if(vtd != -1){
-				return vtd;
+		if(res != 0){
+			ret_ptr = res;
+			if(ret_cons != 0){
+				*ret_cons = cons;
 			}
+			return true;
+		}
+	}
+
+	return false;
+}
+
+//check whether a memory access corresponse to a pointed target (ptarget)
+int ptarget_lookup(func_vertex_ptr func_block, Exp *exp, int block, int stmt){
+	int i, j, k, w;
+	int cons = -1;
+
+	dptr * parent_ptr;
+	bool result = ptr_lookup(func_block, exp, block, stmt, parent_ptr, &cons);
+	if(result == false){
+		return -1;
+	}else{
+		int vtd = ptr_node_lookup(func_block, parent_ptr, cons);
+		if(vtd != -1){
+			return vtd;
 		}
 	}
 
