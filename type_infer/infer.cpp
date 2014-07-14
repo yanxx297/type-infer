@@ -630,8 +630,27 @@ bool cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_n
 				}
 			}
 
-			//Now tmp = a + b
-			//Lookup a and b in graph, and connect them to unsigned node
+			//Now tmp = a < b
+			//check for a special case of switch, which looks like
+			//	sub cons1, reg
+			//	cmp cons2, reg
+			// 	ja <addr>
+			//And ignore this CF if this is the case.
+			//If not, lookup a and b in graph, and connect them to unsigned node
+
+			if(((BinOp *) tmp)->rhs->exp_type == CONSTANT && true == is_tmps(((BinOp *) tmp)->lhs)){
+				Tmp_s * reg = ((Tmp_s *)((BinOp *) tmp)->lhs);
+				Exp *def_reg;
+				if (true == def_searcher(vine_ir_block, current_block, current_stmt, &current_block, &current_stmt, reg, def_reg)) {
+					if(def_reg->exp_type == BINOP
+							&& true == is_tmps(((BinOp *)def_reg)->lhs)
+							&& CONSTANT == ((BinOp *)def_reg)->rhs->exp_type
+							&& ((Tmp_s *)((BinOp *)def_reg)->lhs)->name == reg->name){
+						return false;
+					}
+				}
+			}
+
 			if (((BinOp *) tmp)->lhs != 0) {
 				opr_l = node_searcher(func_list, block_no, stmt_no, ((BinOp *) tmp)->lhs);
 				if (opr_l != -1) {
@@ -1477,6 +1496,9 @@ bool set_edge(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Dwarf_Debug d
 		}else{
 			/*Single type pointer*/
 
+			if(current_exp->name != str_reg[R_EAX]){
+				return false;
+			}
 			Tmp_s *addr = current_exp;
 			Graph::vertex_descriptor vtd = -1;
 
@@ -2356,8 +2378,14 @@ bool get_return_value(fblock_ptr vine_ir_block, int block, int stmt, int *ret_bl
 				Tmp_s *reg = ((Tmp_s *) move->rhs);
 				if (reg->name == str_reg[R_EAX] && (move->lhs->exp_type == MEM || is_tmps(move->lhs) == true)) {
 					//mem[] = eax || reg = eax
-					ret_var = reg; //return EAX
-					break;
+					//reg must not be a flag
+					if((true == is_tmps(move->lhs) && false == is_flag((Tmp_s *)move->lhs))
+							|| false == is_tmps(move->lhs)){
+						ret_var = reg; //return EAX
+						break;
+					}else{
+						return false;
+					}
 				}
 			}
 		}

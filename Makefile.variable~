@@ -1,0 +1,26 @@
+# Qiuchen's locations:
+CC=g++
+LD=g++
+DWARF=/home/yanxx297/research_soft/binary_analysis/dwarf-20130207/libdwarf
+VINE=/home/yanxx297/research_soft/binary_analysis/vine-1.0/libasmir
+VEX=/home/yanxx297/research_soft/binary_analysis/vine-1.0/VEX
+BINUTILS=/usr# Distribution-installed binutils-dev
+HOME=/home/yanxx297/project/src
+
+# Stephen's locations:
+#CC=g++
+#DWARF=/home/fac05/mccamant/re/type-flow/libs/dwarf-20140208/libdwarf
+##VINE=/home/fac05/mccamant/bitblaze/vine/trunk/libasmir
+#VINE=/home/fac05/mccamant/bitblaze/release/vine-1.0+patched/libasmir
+##VEX=/home/fac05/mccamant/bitblaze/vex/r2737
+#VEX=/home/fac05/mccamant/bitblaze/release/vine-1.0+patched/VEX
+#BINUTILS=/home/fac05/mccamant/soft/amd64/gnu/binutils-multiarch/2.22
+#HOME=/home/fac05/mccamant/re/type-flow/type-infer-src
+
+LDFLAGS=-L$(DWARF) -L$(VINE)/src -L$(VEX) -L$(BINUTILS)/lib -Wl,-R$(BINUTILS)/lib 
+CFLAGS=-Wall -w
+FLAGS=-g
+#add -pg for profiling
+I_VINE=-I$(DWARF) -I$(VINE)/src/include -I$(VEX)/pub -I$(VINE)
+INCLUDE=-I$(HOME)/include -I$(BINUTILS)/include
+LIBS=-lasmir -lvex -lbfd -liberty -lopcodes -ldwarf -lelf
