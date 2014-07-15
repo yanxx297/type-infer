@@ -629,6 +629,9 @@ bool cf_handler(fblock_ptr vine_ir_block, func_vertex_ptr func_list, int block_n
 					}
 				}
 			}
+			if(tmp->exp_type != BINOP){
+				return false;
+			}
 
 			//Now tmp = a < b
 			//check for a special case of switch, which looks like
@@ -834,19 +837,25 @@ void handle_shr(func_vertex_ptr func_block, int descriptor, Graph& g) {
 	}
 
 	if (func_block->op_list.at(g_exp[descriptor])->op_type == BIN_OP) {
+		/*test whether this shr operate on a unsigned cast, and ignore it if so*/
+		BinOp *shr_exp = ((BinOp *)func_block->op_list.at(g_exp[descriptor])->exp);
+		if(shr_exp->lhs->exp_type == CAST && (((Cast *)shr_exp->lhs)->cast_type == CAST_LOW || ((Cast *)shr_exp->lhs)->cast_type == CAST_UNSIGNED)){
+			return;
+		}
+
 		if (((Bin_Operation *) func_block->op_list.at(g_exp[descriptor]))->binop_type == RSHIFT) {
 			Graph::vertex_descriptor op_l = ((Bin_Operation *) func_block->op_list.at(g_exp[descriptor]))->operand_l;
 			if (op_l != -1) {
 				if (g_vet[op_l] == VARIABLE) {
 					if (func_block->variable_list.at(g_id[op_l])->debug_info->var_length == 4) {
 						add_edge_with_cap(func_block, op_l, func_block->u_des, MAX_CAP, 0, g);
-						cout << "set " << g_name[op_l] << "to unsigend (>>)" << endl;
+						cout << "set " << g_name[op_l] << " to unsigend (>>)" << endl;
 					}
 				} else if (g_vet[op_l] == REGISTER) {
 					if (func_block->reg_list.at(g_index[op_l])->exp->exp_type == TEMP) {
 						if (((Temp *) func_block->reg_list.at(g_index[op_l])->exp)->typ == REG_32) {
 							add_edge_with_cap(func_block, op_l, func_block->u_des, MAX_CAP, 0, g);
-							cout << "set " << g_name[op_l] << "to unsigend (>>)" << endl;
+							cout << "set " << g_name[op_l] << " to unsigend (>>)" << endl;
 						}
 					}
 				} else if (g_vet[op_l] == OPERATION) {
@@ -1174,9 +1183,9 @@ void check_movzsbl(func_vertex_ptr func_list, int block, int stmt, Cast *src, Tm
 		}
 	}
 	case CAST:{
-		return;
-		//typ = ((Cast *) src->exp)->typ;
-		//break;
+		//return;FIXME: why return????
+		typ = ((Cast *) src->exp)->typ;
+		break;
 	}
 	default:
 		break;

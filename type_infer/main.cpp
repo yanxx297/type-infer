@@ -925,8 +925,8 @@ void handle_function(vector<vine_block_t *> &vine_blocks, asm_program_t * prog, 
 	id_to_vineir(func_list, g);
 
 //	Apply debug tools
-//	Traits::vertex_descriptor src = 0;
-//	print_path(src, func_list->u_des, g);
+//	Traits::vertex_descriptor src = 1;
+//	print_path(src, func_list->s_des, g);
 //	End of debug tools
 
 	//Display pointed info
