@@ -727,6 +727,20 @@ void visit_exp(fblock_ptr vine_ir_block, func_vertex_ptr func_list, Graph& g) {
 					check_movzsbl(func_list, j, k, src, dst, v_r, g);
 				}
 
+				//check PHI
+				if(((Move *) vine_ir_block->block_list[j]->block[k])->rhs->exp_type == PHI
+						&& v_l != -1
+						&& true == is_tmps(((Move *) vine_ir_block->block_list[j]->block[k])->lhs)){
+					//Connect all branch variables with PHI node
+					Phi *phi = (Phi *)((Move *) vine_ir_block->block_list[j]->block[k])->rhs;
+					for(int i = 0; i < phi->vars.size(); i++){
+						Graph::vertex_descriptor branch = read_exp(func_list, j, k, phi->vars.at(i), g);
+						if(branch != -1){
+							add_edge_with_cap(func_list, branch, v_l, 1, 0, g);
+						}
+					}
+				}
+
 				add_edge_with_cap(func_list, v_r, v_l, 1, 1, g);
 				break;
 			}

@@ -101,6 +101,7 @@ public:
 	vertex(vertex_type_t vertex_type, Graph::vertex_descriptor descriptor);
 	vertex_type_t vertex_type;
 	Graph::vertex_descriptor my_descriptor;
+	Graph::vertex_descriptor global_descriptor;
 };
 
 class Variable: public vertex{
